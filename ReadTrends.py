@@ -10,10 +10,10 @@ import Sensitive
 import pandas as pd
 import matplotlib.pyplot as plt
 from alpha_vantage.timeseries import TimeSeries
-from StockSelect import * # Import Stocks
+#from StockSelect import * # Import Stocks
 
 #key = open('API_Ket.txt').read() ## Use if want to hide key in Text File
-key = 
+key = Sensitive.API_Key
 
 # Call to get data (split out meta)
 ts = TimeSeries(key, output_format = 'pandas')
@@ -37,9 +37,6 @@ lows = market.loc[market.groupby('TradeDate')['low'].idxmin()]['low']
 highs = market.loc[market.groupby('TradeDate')['high'].idxmax()]['high']
 lowest = lows.min()
 highest = highs.max()
-
-print(lows, highs)
-print(highest, lowest)
 
 # plt.plot(day_agg['low'], label='Low')
 # plt.plot(day_agg['high'], label='High')
