@@ -1,0 +1,11 @@
+{
+    "17Nov2021": {
+        "StockName": "PREM.L",
+        "Trades": {
+            "TradeNo.": 1,
+            "Price": 5000,
+            "Time": "21:21:01",
+            "Decision": "Not Sure"
+        }
+    }
+}
