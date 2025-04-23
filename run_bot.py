@@ -27,7 +27,7 @@ def init_portfolio():
 
 def ran_select_today():
     """Has SelectStocks.py already run today?"""
-    if not os.path.exists(LAST_SELECT_RUN)
+    if not os.path.exists(LAST_SELECT_RUN):
         return False
     return open(LAST_SELECT_RUN).read().strip() == str(date.today())
 
