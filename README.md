@@ -42,3 +42,4 @@ This bot uses a **Moving Average Crossover** method:
    ```bash
    git clone https://github.com/yourusername/stock-trading-bot.git
    cd stock-trading-bot
+   python run_bot.py
