@@ -1,7 +1,7 @@
 # summarize_trades.py
 
 import json
-from datetime import date
+from datetime import date, datetime, timedelta
 import pandas as pd
 import yfinance as yf
 
@@ -71,12 +71,21 @@ total_value = round(cash_remaining + total_market_value, 2)
 # Compute change vs initial cash (e.g., starting portfolio value)
 change_total = round(total_value - initial_cash, 2)
 
-# Compute change since last recorded portfolio value
+# Get the last snapshot from the previous calendar day
 history = portfolio.get("history", [])
-if history:
-    last_snapshot = history[-1]
-    last_total = last_snapshot.get("total_value", total_value)
-    change_since_last = round(total_value - last_total, 2)
+yesterday = date.today() - timedelta(days=1)
+
+# Parse datetimes and filter for entries from yesterday
+prev_day_snapshots = [
+    h for h in history
+    if "datetime" in h and datetime.fromisoformat(h["datetime"]).date() == yesterday
+]
+
+if prev_day_snapshots:
+    # Use the last snapshot from the previous day
+    last_prev_day = max(prev_day_snapshots, key=lambda h: h["datetime"])
+    prev_day_value = last_prev_day.get("total_value", total_value)
+    change_since_last = round(total_value - prev_day_value, 2)
 else:
     change_since_last = 0.0
 
@@ -113,7 +122,7 @@ print(f" • Total trades executed: {output['total_trades']}")
 print(f" • Cash remaining:        ${output['cash_remaining']:.2f}")
 print(f" • Market value:          ${output['market_value']:.2f}")
 print(f" • TOTAL portfolio value: {total_color}${output['total_value']:.2f} "
-      f"({delta_str} | {delta_last_str} since last check){reset}")
+      f"({delta_str} | {delta_last_str} since yesterday){reset}")
 print("Holdings:")
 for tkr, info in output["holdings"].items():
     cost = info["cost_basis"]

@@ -129,9 +129,32 @@ if buy_list:
                 price_map[t] = lp
 
         while True:
-            viable = {t: p for t, p in price_map.items() if p <= cash}
+            # Recompute total portfolio value before each iteration
+            total_val = cash
+            prices = {}
+            for t, shares in holdings.items():
+                lp = price_map.get(t)
+                if not lp:
+                    lp = yf.Ticker(t).fast_info.last_price or 0
+                    price_map[t] = lp
+                total_val += shares * lp
+
+            # Filter viable stocks by price and allocation constraint
+            viable = {}
+            for t, p in price_map.items():
+                if p > cash or p == 0:
+                    continue
+                current_shares = holdings.get(t, 0)
+                current_val = current_shares * p
+                future_val = current_val + p
+                future_alloc = future_val / total_val if total_val > 0 else 0
+                if future_alloc <= MAX_ALLOC:
+                    viable[t] = p
+
             if not viable:
                 break
+
+            # Buy the cheapest viable stock
             pick, price = min(viable.items(), key=lambda kv: kv[1])
             cash -= price
             holdings[pick] = holdings.get(pick, 0) + 1
@@ -143,6 +166,7 @@ if buy_list:
                 "shares": 1
             })
             summary["opportunistic"].append((pick, price))
+
     else:
         summary["no_alloc"] = True
 else:
