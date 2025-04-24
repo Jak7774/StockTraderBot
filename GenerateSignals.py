@@ -9,6 +9,23 @@ try:
 except FileNotFoundError:
     holdings = set()
 
+# ─── 1b) LOAD TRADES AND BUILD COST BASIS MAP ────────────────────────────────────
+# so we can apply stop-loss / take-profit - override MA logic
+try:
+    with open("trades_log.json") as f:
+        trades = json.load(f)
+    data_trades = pd.DataFrame(trades)
+    cost_basis_map = {}
+    for ticker, sub in data_trades.groupby("ticker"):
+        buys  = sub[sub["action"] == "BUY"]
+        sells = sub[sub["action"] == "SELL"]
+        net_shares = buys["shares"].sum() - sells["shares"].sum()
+        net_cost   = (buys["shares"] * buys["price"]).sum() - (sells["shares"] * sells["price"]).sum()
+        if net_shares > 0:
+            cost_basis_map[ticker] = net_cost / net_shares
+except (FileNotFoundError, ValueError):
+    cost_basis_map = {}
+
 # ─── 2) LOAD TODAY'S SCREEN ────────────────────────────────────────────────────
 with open("daily_screen.json", "r") as f:
     screen = json.load(f)
@@ -21,6 +38,10 @@ print(f"Candidates to SELL: {to_sell}\n")
 # ─── 3) PARAMETERS ──────────────────────────────────────────────────────────────
 SHORT_W = 5 
 LONG_W  = 20
+
+# Parameters to Sell if Rapid changes (not detected by Moving Averages)
+STOP_LOSS_PCT   = 0.10   # e.g. 10% drop
+TAKE_PROFIT_PCT= 0.15   # e.g. 15% gain
 
 # Optional fast trading mode parameters (commented out for now)
 # USE_FAST_STRATEGY = True
@@ -39,14 +60,14 @@ def last_signal(ticker):
     
     # Determine frequency to use
     # if USE_FAST_STRATEGY:
-    #     interval = FAST_INTERVAL
-    #     period   = FAST_PERIOD
+    #     interval, period = FAST_INTERVAL, FAST_PERIOD
     # else:
-    interval = "1d"
-    period   = "60d"
 
+    # 1) Fetch & cache price series
+    interval, period = "1d", "60d"
     if ticker not in price_data_cache:
-        data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
+        data = yf.download(ticker, period=period, interval=interval,
+                         auto_adjust=True, progress=False)
         price_data_cache[ticker] = data
     else:
         data = price_data_cache[ticker]
@@ -54,8 +75,9 @@ def last_signal(ticker):
     if data.empty or len(data) < LONG_W:
         return None, None
 
-    data["Short_MA"] = data["Close"].rolling(window=SHORT_W).mean()
-    data["Long_MA"]  = data["Close"].rolling(window=LONG_W).mean()
+    # 3) Compute MAs & positions
+    data["Short_MA"] = data["Close"].rolling(SHORT_W).mean()
+    data["Long_MA"]  = data["Close"].rolling(LONG_W).mean()
     data["Signal"]   = 0
     data.loc[data.index[SHORT_W:], "Signal"] = (
         data["Short_MA"].iloc[SHORT_W:] > data["Long_MA"].iloc[SHORT_W:]
@@ -64,10 +86,23 @@ def last_signal(ticker):
 
     recent = data[data["Position"].isin([1, -1])]
     if recent.empty:
-        return "HOLD", data["Close"].iloc[-1].item()
-    last = recent.iloc[-1]
-    sig  = "BUY" if last["Position"].item() == 1 else "SELL"
-    return sig, last["Close"].item()
+        ma_sig = "HOLD"
+        price  = data["Close"].iloc[-1]
+    else:
+        last    = recent.iloc[-1]
+        ma_sig  = "BUY" if last["Position"].item() == 1 else "SELL"
+        price   = last["Close"]
+
+    # 4) Apply stop-loss / take-profit if we own the ticker
+    cb = cost_basis_map.get(ticker)
+    if cb is not None:
+        if price <= cb * (1 - STOP_LOSS_PCT):
+            return "SELL", price
+        if price >= cb * (1 + TAKE_PROFIT_PCT):
+            return "SELL", price
+
+    # 5) Otherwise return the MA‐based signal
+    return ma_sig, float(price.iloc[0])
 
 # ─── 5) CHECK BUY CANDIDATES ────────────────────────────────────────────────────
 for t in to_buy:
