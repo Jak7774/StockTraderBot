@@ -9,16 +9,16 @@ S.No.,Company Name,Symbol
 8,Associated British Foods PLC ,ABF
 9,Astrazeneca PLC ,AZN
 10,Auto Trader Group PLC ,AUTO
-11,Aviva PLC ,AV.
-12,BAE Systems PLC ,BA.
+11,Aviva PLC ,AV
+12,BAE Systems PLC ,BA
 13,Barclays PLC ,BARC
 14,Barratt Redrow PLC ,BTRW
 15,Beazley PLC ,BEZ
 16,Berkeley Group Holdings (The) PLC,BKG
-17,BP PLC ,BP.
+17,BP PLC ,BP
 18,British American Tobacco PLC ,BATS
 19,British Land Co PLC ,BLND
-20,BT Group PLC ,BT.A
+20,BT Group PLC ,BT-A
 21,Bunzl PLC ,BNZL
 22,Centrica PLC,CNA
 23,Coca-Cola HBC AG,CCH
@@ -39,7 +39,7 @@ S.No.,Company Name,Symbol
 38,GSK PLC ,GSK
 39,Haleon PLC ,HLN
 40,Halma PLC ,HLMA
-41,Hargreaves Lansdown PLC,HL.
+41,Hargreaves Lansdown PLC,HL
 42,Hikma Pharmaceuticals PLC ,HIK
 43,Hiscox Ld ,HSX
 44,Howden Joinery Group PLC ,HWDN
@@ -51,7 +51,7 @@ S.No.,Company Name,Symbol
 50,Intermediate Capital Group PLC ,ICG
 51,Intertek Group PLC ,ITRK
 52,Intl Consolidated Airlines Group Sa,IAG
-53,JD Sports Fashion PLC,JD.
+53,JD Sports Fashion PLC,JD
 54,Kingfisher PLC,KGF
 55,Land Securities Group PLC ,LAND
 56,Legal & General Group PLC ,LGEN
@@ -62,7 +62,7 @@ S.No.,Company Name,Symbol
 61,Marks & Spencer Group PLC ,MKS
 62,Melrose Industries PLC ,MRO
 63,Mondi PLC ,MNDI
-64,National Grid PLC ,NG.
+64,National Grid PLC ,NG
 65,Natwest Group PLC ,NWG
 66,Next PLC ,NXT
 67,Pearson PLC ,PSON
@@ -75,7 +75,7 @@ S.No.,Company Name,Symbol
 74,Rentokil Initial PLC ,RTO
 75,Rightmove PLC ,RMV
 76,Rio Tinto PLC,RIO
-77,Rolls-Royce Holdings PLC ,RR.
+77,Rolls-Royce Holdings PLC ,RR
 78,Sage Group PLC ,SGE
 79,Sainsbury(J) PLC ,SBRY
 80,Schroders PLC ,SDR
@@ -83,18 +83,18 @@ S.No.,Company Name,Symbol
 82,Segro PLC ,SGRO
 83,Severn Trent PLC ,SVT
 84,Shell PLC,SHEL
-85,Smith & Nephew PLC ,SN.
+85,Smith & Nephew PLC ,SN
 86,Smith (Ds) PLC ,SMDS
 87,Smiths Group PLC ,SMIN
 88,Spirax Group PLC ,SPX
 89,SSE PLC ,SSE
 90,St.James'S Place PLC ,STJ
 91,Standard Chartered PLC ,STAN
-92,Taylor Wimpey PLC ,TW.
+92,Taylor Wimpey PLC ,TW
 93,Tesco PLC ,TSCO
 94,Unilever PLC,ULVR
 95,Unite Group PLC ,UTG
-96,United Utilities Group PLC ,UU.
+96,United Utilities Group PLC ,UU
 97,Vodafone Group PLC ,VOD
 98,Weir Group PLC ,WEIR
 99,Whitbread PLC ,WTB
