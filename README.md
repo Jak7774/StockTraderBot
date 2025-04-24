@@ -43,3 +43,9 @@ This bot uses a **Moving Average Crossover** method:
    git clone https://github.com/yourusername/stock-trading-bot.git
    cd stock-trading-bot
    python run_bot.py
+
+## 🙌 Credits
+
+- Developed by Jack Elkes.
+- Trading strategy inspired by moving average crossover techniques.
+- Built with insights and coding support from [ChatGPT](https://openai.com/chatgpt).
