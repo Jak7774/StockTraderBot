@@ -4,6 +4,7 @@ import json
 from datetime import date, datetime, timedelta
 import pandas as pd
 import yfinance as yf
+import matplotlib.pyplot as plt
 
 LOG_FILE        = "trades_log.json"
 PORTFOLIO_FILE  = "portfolio_summary.json"
@@ -140,3 +141,20 @@ for tkr, info in output["holdings"].items():
       f"current ${current} → ${info['market_value']}{reset}")
 
 print(f"\n✅ Saved trade summary to {OUTPUT_FILE}")
+
+# ─── 10) PLOT PROFIT/LOSS SUMMARY ──────────────────────────────────────────────────
+# Extract the history section
+history = portfolio['history']
+df = pd.DataFrame(history)
+df['datetime'] = pd.to_datetime(df['datetime'])
+df.set_index('datetime', inplace=True)
+
+# Plot total value over time
+plt.figure(figsize=(12, 6))
+plt.plot(df.index, df['total_value'], marker='o')
+plt.title('Portfolio Total Value Over Time')
+plt.xlabel('Time')
+plt.ylabel('Total Value (£)')
+plt.grid(True)
+plt.tight_layout()
+plt.show()
