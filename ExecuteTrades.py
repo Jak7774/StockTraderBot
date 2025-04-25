@@ -13,6 +13,7 @@ SCREEN_FILE    = "daily_screen.json"
 INITIAL_CASH   = 10_000
 MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
+ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
 
 # ─── 2) LOAD OR INIT PORTFOLIO ──────────────────────────────────────────────────
 if os.path.exists(PORTFOLIO_FILE):
@@ -104,21 +105,35 @@ if buy_list:
             info = buy_sigs[t]
             alloc = w * start_cash
             price = info["latest_price"]
-            shares = int(alloc // price)
-            if shares > 0:
+
+            if ALLOW_FRACTIONAL:
+                shares = round(alloc / price, 6)
+                if shares < 0.001:
+                    summary["skipped"].append((t, alloc, price))
+                    continue
+                shares = round(shares, 3)
                 cost = shares * price
-                cash -= cost
-                holdings[t] = holdings.get(t, 0) + shares
-                trade_log.append({
-                    "ticker": t,
-                    "action": "BUY",
-                    "date": str(date.today()),
-                    "price": price,
-                    "shares": shares
-                })
-                summary["bought"].append((t, shares, price))
             else:
+                shares = int(alloc // price)
+                if shares == 0:
+                    summary["skipped"].append((t, alloc, price))
+                    continue
+                cost = shares * price
+
+            if cost > cash:
                 summary["skipped"].append((t, alloc, price))
+                continue
+
+            cash -= cost
+            holdings[t] = round(holdings.get(t, 0) + shares, 3)
+            trade_log.append({
+                "ticker": t,
+                "action": "BUY",
+                "date": str(date.today()),
+                "price": price,
+                "shares": shares
+            })
+            summary["bought"].append((t, shares, price))
 
         # Opportunistic buys
         price_map = {}
@@ -142,11 +157,11 @@ if buy_list:
             # Filter viable stocks by price and allocation constraint
             viable = {}
             for t, p in price_map.items():
-                if p > cash or p == 0:
+                if p == 0 or cash < (p if not ALLOW_FRACTIONAL else 0.01):
                     continue
                 current_shares = holdings.get(t, 0)
                 current_val = current_shares * p
-                future_val = current_val + p
+                future_val = current_val + (p if not ALLOW_FRACTIONAL else cash)
                 future_alloc = future_val / total_val if total_val > 0 else 0
                 if future_alloc <= MAX_ALLOC:
                     viable[t] = p
@@ -154,18 +169,36 @@ if buy_list:
             if not viable:
                 break
 
-            # Buy the cheapest viable stock
+            # Pick the stock with the best (lowest) price
             pick, price = min(viable.items(), key=lambda kv: kv[1])
-            cash -= price
-            holdings[pick] = holdings.get(pick, 0) + 1
+
+            if ALLOW_FRACTIONAL:
+                max_invest = min(cash, (MAX_ALLOC * total_val) - holdings.get(pick, 0) * price)
+                shares = round(max_invest / price, 6)
+                if shares < 0.001:
+                    break
+                shares = round(shares, 3)
+                cost = shares * price
+            else:
+                if price > cash:
+                    break
+                shares = 1
+                cost = price
+
+            if cost > cash:
+                break
+
+            cash -= cost
+            holdings[pick] = round(holdings.get(pick, 0) + shares, 3)
             trade_log.append({
                 "ticker": pick,
                 "action": "BUY",
                 "date": str(date.today()),
                 "price": price,
-                "shares": 1
+                "shares": shares
             })
-            summary["opportunistic"].append((pick, price))
+            summary["opportunistic"].append((pick, price, shares))
+
 
     else:
         summary["no_alloc"] = True
@@ -189,8 +222,9 @@ else:
             print(f"  - {t}: alloc ${alloc:.2f} < price ${price:.2f}")
     if summary["opportunistic"]:
         print(f"💡 Opportunistic buys: {len(summary['opportunistic'])}")
-        for t, p in summary["opportunistic"]:
-            print(f"  - {t}: 1 share @ ${p:.2f}")
+        for t, p, s in summary["opportunistic"]:
+            print(f"  - {t}: {s:.3f} shares @ ${p:.2f}")
+
 
 # ─── 7) SAVE TRADE LOG ──────────────────────────────────────────────────────────
 with open(TRADES_LOG, "w") as f:

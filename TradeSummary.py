@@ -42,7 +42,7 @@ for ticker, sub in df.groupby("ticker"):
         cost_basis = None
 
     summary[ticker] = {
-        "shares":      int(net_shares),
+        "shares":      round(net_shares, 3),
         "cost_basis":  round(cost_basis, 2) if cost_basis is not None else None
     }
 
@@ -136,7 +136,7 @@ for tkr, info in output["holdings"].items():
     else:
         color = "\033[0m"
     reset = "\033[0m"
-    print(f"{color}  {tkr}: {info['shares']} shares, cost basis ${cost}, "
-          f"current ${current} → ${info['market_value']}{reset}")
+    print(f"{color}  {tkr:<6} = {info['shares']:.3f} shares, cost basis ${cost}, "
+      f"current ${current} → ${info['market_value']}{reset}")
 
 print(f"\n✅ Saved trade summary to {OUTPUT_FILE}")
