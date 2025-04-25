@@ -29,11 +29,13 @@ except (FileNotFoundError, ValueError):
 # ─── 2) LOAD TODAY'S SCREEN ────────────────────────────────────────────────────
 with open("daily_screen.json", "r") as f:
     screen = json.load(f)
-to_buy  = screen.get("to_buy", [])
-to_sell = screen.get("to_sell", [])
+to_buy = screen.get("to_buy", [])
+
+# Instead of using to_sell from daily_screen, use all current holdings
+to_sell = list(holdings)
 
 print(f"Candidates to BUY : {to_buy}")
-print(f"Candidates to SELL: {to_sell}\n")
+print(f"Candidates to SELL (from current holdings): {to_sell}\n")
 
 # ─── 3) PARAMETERS ──────────────────────────────────────────────────────────────
 SHORT_W = 5 
@@ -96,9 +98,9 @@ def last_signal(ticker):
     # 4) Apply stop-loss / take-profit if we own the ticker
     cb = cost_basis_map.get(ticker)
     if cb is not None:
-        if price <= cb * (1 - STOP_LOSS_PCT):
+        if price.item() <= cb * (1 - STOP_LOSS_PCT):
             return "SELL", price
-        if price >= cb * (1 + TAKE_PROFIT_PCT):
+        if price.item() >= cb * (1 + TAKE_PROFIT_PCT):
             return "SELL", price
 
     # 5) Otherwise return the MA‐based signal
@@ -110,13 +112,12 @@ for t in to_buy:
     if sig == "BUY":
         buy_signals[t] = {"latest_price": round(price, 2), "signal": sig}
 
-# ─── 6) CHECK SELL CANDIDATES ───────────────────────────────────────────────────
-for t in to_sell:
-    if t not in holdings:
-        continue
+# ─── 6) CHECK ALL CURRENT HOLDINGS FOR SELL SIGNALS ─────────────────────────────
+for t in holdings:
     sig, price = last_signal(t)
     if sig == "SELL":
         sell_signals[t] = {"latest_price": round(price, 2), "signal": sig}
+
 
 # ─── 7) SAVE TRADE SIGNALS ─────────────────────────────────────────────────────
 out = {
