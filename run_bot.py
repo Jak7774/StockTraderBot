@@ -96,6 +96,9 @@ def job():
         # 6) Rerun generate+execute on pruned universe
         run_script("GenerateSignals.py")
         run_script("ExecuteTrades.py")
+
+        # 7) Monitor deferred sells (for trending up stocks)
+        run_script("MonitorDeferredSells.py")
     else:
         print("No new sells this run.")
 

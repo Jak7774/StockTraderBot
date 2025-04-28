@@ -10,6 +10,8 @@ PORTFOLIO_FILE = "portfolio_summary.json"
 TRADES_LOG     = "trades_log.json"
 SIGNALS_FILE   = "trade_signals.json"
 SCREEN_FILE    = "daily_screen.json"
+DEFERRED_SELLS_FILE = "deferred_sells.json"
+CLEAN_THRESHOLD_DAYS = 5  # How many days before we remove old deferred sells?
 INITIAL_CASH   = 10_000
 MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
@@ -44,8 +46,29 @@ if os.path.exists(TRADES_LOG):
 else:
     trade_log = []
 
-# ─── 5) EXECUTE SELLS ───────────────────────────────────────────────────────────
+# ─── 5) EXECUTE SELLS (WITH DEFERRED IF MOMENTUM POSITIVE) ──────────────────────
+
+# Load existing deferred sells (if any)
+if os.path.exists(DEFERRED_SELLS_FILE):
+    with open(DEFERRED_SELLS_FILE) as f:
+        deferred_sells = json.load(f)
+else:
+    deferred_sells = {}
+
 for tkr, info in sell_sigs.items():
+    momentum = momentum_map.get(tkr, 0)
+
+    if momentum > 0:
+        # Defer selling stocks still trending upward
+        deferred_sells[tkr] = {
+            "latest_price": info["latest_price"],
+            "momentum": momentum,
+            "date_flagged": str(date.today())
+        }
+        print(f"⏩ Deferred selling {tkr}: positive momentum ({momentum:.2f})")
+        continue
+
+    # Otherwise, sell normally
     if tkr in holdings:
         shares = holdings.pop(tkr)
         price  = info["latest_price"]
@@ -53,11 +76,48 @@ for tkr, info in sell_sigs.items():
         trade_log.append({
             "ticker": tkr,
             "action": "SELL",
-            "date":   str(date.today()),
+            "date":   str(datetime.date.today()),
             "price":  price,
             "shares": shares
         })
         print(f"Sold {shares} of {tkr} @ ${price:.2f}")
+
+# Save updated deferred sells
+with open(DEFERRED_SELLS_FILE, "w") as f:
+    json.dump(deferred_sells, f, indent=2)
+print(f"\n📄 Deferred sells updated in {DEFERRED_SELLS_FILE} ({len(deferred_sells)} tickers)")
+
+# ─── 5B) AUTO-CLEAN OLD OR INVALID DEFERRED SELLS ───────────────────────────────
+cleaned_deferred_sells = {}
+today = date.today()
+
+for tkr, record in deferred_sells.items():
+    try:
+        flagged_date = datetime.strptime(record["date_flagged"], "%Y-%m-%d").date()
+    except Exception as e:
+        print(f"⚠️ Skipping {tkr} due to invalid date format: {e}")
+        continue
+
+    age_days = (today - flagged_date).days
+
+    # Only keep deferred sells if:
+    # 1) Ticker is still in holdings
+    # 2) Flagged within CLEAN_THRESHOLD_DAYS
+    if tkr in holdings and age_days <= CLEAN_THRESHOLD_DAYS:
+        cleaned_deferred_sells[tkr] = record
+    else:
+        reason = []
+        if tkr not in holdings:
+            reason.append("not in holdings")
+        if age_days > CLEAN_THRESHOLD_DAYS:
+            reason.append(f"deferred {age_days} days ago")
+        print(f"🧹 Removing {tkr} from deferred sells ({' and '.join(reason)})")
+
+# Save cleaned deferred sells
+with open(DEFERRED_SELLS_FILE, "w") as f:
+    json.dump(cleaned_deferred_sells, f, indent=2)
+
+print(f"\n🧽 Deferred sells cleaned: {len(cleaned_deferred_sells)} active tickers remain")
 
 # ─── 6) EXECUTE BUYS (MOMENTUM WEIGHTED + CAP + MIN + GREEDY) ──────────────────
 buy_list = [t for t in buy_sigs if t in momentum_map and momentum_map[t] > 0]

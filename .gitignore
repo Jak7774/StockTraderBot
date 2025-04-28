@@ -4,3 +4,4 @@ selectstocks_last_run.txt
 trade_signals.json
 trade_summary.json
 trades_log.json
+deferred_sells.json
