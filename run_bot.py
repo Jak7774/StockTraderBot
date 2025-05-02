@@ -37,14 +37,31 @@ def mark_select_ran():
         f.write(str(date.today()))
 
 def get_todays_sells():
-    """Return set of tickers SELLed today by scanning trades_log.json."""
-    if not os.path.exists(TRADE_LOG):
-        return set()
-    with open(TRADE_LOG) as f:
-        logs = json.load(f)
+    """Return set of tickers SELLed today or added to deferred sells today."""
     today_str = str(date.today())
-    return {entry["ticker"] for entry in logs
-            if entry["action"] == "SELL" and entry["date"] == today_str}
+    sells = set()
+
+    # Check trades_log.json
+    if os.path.exists(TRADE_LOG):
+        with open(TRADE_LOG) as f:
+            logs = json.load(f)
+        sells.update({
+            entry["ticker"]
+            for entry in logs
+            if entry["action"] == "SELL" and entry["date"] == today_str
+        })
+
+    # Check deferred_sells.json
+    if os.path.exists("deferred_sells.json"):
+        with open("deferred_sells.json") as f:
+            deferred = json.load(f)
+        sells.update({
+            ticker
+            for ticker, data in deferred.items()
+            if data.get("date_flagged") == today_str
+        })
+
+    return sells
 
 def prune_sold_from_screen(sold_set):
     """Remove sold tickers from daily_screen.json (top_100, to_buy, momentum)."""

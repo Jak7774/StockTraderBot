@@ -253,7 +253,7 @@ if buy_list:
             trade_log.append({
                 "ticker": pick,
                 "action": "BUY",
-                "date": str(date.today()),
+                "date": str(datetime.date.today()),
                 "price": price,
                 "shares": shares
             })

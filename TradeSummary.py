@@ -24,6 +24,9 @@ df = pd.DataFrame(trades)
 total_trades = len(df)
 
 # ─── 3) AGGREGATE BUY/SELL BY TICKER ────────────────────────────────────────────
+buy_count = len(df[df["action"] == "BUY"])
+sell_count = len(df[df["action"] == "SELL"])
+
 summary = {}
 for ticker, sub in df.groupby("ticker"):
     buys  = sub[sub["action"] == "BUY"]
@@ -39,8 +42,12 @@ for ticker, sub in df.groupby("ticker"):
         # average cost basis, adjusted for proceeds of sells
         net_cost = total_buy_cost - total_sell_proceed
         cost_basis = net_cost / net_shares
+        summary[ticker] = {
+            "shares":      round(net_shares, 3),
+            "cost_basis":  round(cost_basis, 2) if cost_basis is not None else None
+        }
     else:
-        cost_basis = None
+        continue  # Do not include stocks with no remaining shares
 
     summary[ticker] = {
         "shares":      round(net_shares, 3),
@@ -94,6 +101,8 @@ else:
 output = {
     "date":             str(date.today()),
     "total_trades":     total_trades,
+    "buys":             buy_count,
+    "sells":            sell_count,
     "cash_remaining":   round(cash_remaining, 2),
     "market_value":     round(total_market_value, 2),
     "total_value":      total_value,
@@ -120,6 +129,7 @@ delta_last_str = f"{change_since_last:+.2f}"
 
 print(f"Trade summary for {output['date']}:")
 print(f" • Total trades executed: {output['total_trades']}")
+print(f" • Buys = {output['buys']} / Sells = {output['sells']}")
 print(f" • Cash remaining:        ${output['cash_remaining']:.2f}")
 print(f" • Market value:          ${output['market_value']:.2f}")
 print(f" • TOTAL portfolio value: {total_color}${output['total_value']:.2f} "

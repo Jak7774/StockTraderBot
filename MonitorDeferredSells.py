@@ -47,30 +47,40 @@ def monitor_deferred():
         print(f"Monitoring {len(deferred)} deferred sells...")
         now = datetime.datetime.now()
 
-        for stock in deferred.copy():
-            price = get_current_price(stock["ticker"])  # Fetch live price here
-            if price < stock["last_price"]:
+        for ticker, stock in list(deferred.items()):
+            price = get_current_price(ticker)  # Fetch live price here
+            if price < stock["latest_price"]:
                 # Price started falling, sell stock
-                sell(stock["ticker"], portfolio, trade_log, price, stock["last_price"])
-                deferred.remove(stock)
+                sell(ticker, portfolio, trade_log, price, stock["latest_price"])
+                deferred.pop(ticker)
+                if not deferred:
+                    print("All deferred sells processed. Exiting.")
+                    save_deferred(deferred)
+                    save_portfolio(portfolio)
+                    save_trade_log(trade_log)
+                    return
             elif now.hour >= 15 and now.minute >= 50:
                 # Near market close, sell stock
-                sell(stock["ticker"], portfolio, trade_log, price, stock["last_price"])
-                deferred.remove(stock)
+                sell(ticker, portfolio, trade_log, price, stock["latest_price"])
+                deferred.pop(ticker)
+                if not deferred:
+                    print("All deferred sells processed. Exiting.")
+                    save_deferred(deferred)
+                    save_portfolio(portfolio)
+                    save_trade_log(trade_log)
+                    return
             else:
-                # Update last price if price is still increasing
-                if price > stock["last_price"]:
-                    stock["last_price"] = price
+                if price > stock["latest_price"]:
+                    stock["latest_price"] = price
 
         save_deferred(deferred)
         save_portfolio(portfolio)
         save_trade_log(trade_log)
         time.sleep(600)  # Check every 10 minutes
 
-def sell(ticker, portfolio, trade_log, price, last_price):
+def sell(ticker, portfolio, trade_log, price):
     shares = portfolio["holdings"].pop(ticker, 0)
     if shares > 0:
-        cash = portfolio["cash"]
         portfolio["cash"] += shares * price
         trade_log.append({
             "ticker": ticker,
@@ -80,21 +90,45 @@ def sell(ticker, portfolio, trade_log, price, last_price):
             "shares": shares
         })
         print(f"Sold {shares} of {ticker} @ ${price:.2f}")
-        
-        # Update portfolio history
+
+        # Use the same logic as ExecuteTrades.py for updating total value
+        total_val = portfolio["cash"]
+        for t, shares in portfolio["holdings"].items():
+            tk = yf.Ticker(t)
+            lp = tk.fast_info.last_price or 0
+            total_val += shares * lp
+
+        # Update history
         portfolio["history"].append({
-            "datetime": str(datetime.datetime.now()),
-            "cash": portfolio["cash"],
-            "total_value": portfolio["cash"] + sum(
-                get_current_price(tkr) * qty for tkr, qty in portfolio["holdings"].items()
-            ),
-            "holdings": [{"ticker": tkr, "shares": qty} for tkr, qty in portfolio["holdings"].items()]
+            "datetime":    datetime.datetime.now().isoformat(),
+            "cash":        round(portfolio["cash"], 2),
+            "total_value": round(total_val, 2),
+            "holdings":    portfolio["holdings"]
         })
+
+        # Save the updated portfolio summary
+        new_summary = {
+            "date":     str(datetime.date.today()),
+            "cash":     round(portfolio["cash"], 2),
+            "holdings": portfolio["holdings"],
+            "history":  portfolio["history"]
+        }
+        save_portfolio(new_summary)
 
 def get_current_price(ticker):
     stock = yf.Ticker(ticker)
-    price = stock.fast_info.get('last_price', 0)  # Use 0 if price is not available
-    return price
+    price = stock.fast_info.get("last_price", None)
+
+    if price is None or price == 0:
+        try:
+            hist = stock.history(period="1d")
+            if not hist.empty:
+                price = hist["Close"].iloc[-1]
+        except Exception as e:
+            print(f"Error fetching historical price for {ticker}: {e}")
+            price = 0
+
+    return price or 0
 
 if __name__ == "__main__":
     monitor_deferred()
