@@ -217,24 +217,24 @@ else:
     summary['no_signals'] = True
 
 # ─── PRINT SUMMARY ──────────────────────────────────────────────────────────────
-print("\n=== Buy Summary ===")
-if summary["no_signals"]:
-    print("No positive-momentum buy signals to execute.")
-elif summary["no_alloc"]:
-    print("⚠️ No tickers met the 1% min allocation threshold.")
-else:
-    if summary["bought"]:
-        print(f"✅ Bought: {len(summary['bought'])} tickers")
-        for t, s, p in summary["bought"]:
-            print(f"  - {t}: {s} shares @ ${p:.2f}")
-    if summary["skipped"]:
-        print(f"⚠️ Skipped (alloc < price): {len(summary['skipped'])}")
-        for t, alloc, price in summary["skipped"]:
-            print(f"  - {t}: alloc ${alloc:.2f} < price ${price:.2f}")
-    if summary["opportunistic"]:
-        print(f"💡 Opportunistic buys: {len(summary['opportunistic'])}")
-        for t, p, s in summary["opportunistic"]:
-            print(f"  - {t}: {s:.3f} shares @ ${p:.2f}")
+# print("\n=== Buy Summary ===")
+# if summary["no_signals"]:
+#     print("No positive-momentum buy signals to execute.")
+# elif summary["no_alloc"]:
+#     print("⚠️ No tickers met the 1% min allocation threshold.")
+# else:
+#     if summary["bought"]:
+#         print(f"✅ Bought: {len(summary['bought'])} tickers")
+#         for t, s, p in summary["bought"]:
+#             print(f"  - {t}: {s} shares @ ${p:.2f}")
+#     if summary["skipped"]:
+#         print(f"⚠️ Skipped (alloc < price): {len(summary['skipped'])}")
+#         for t, alloc, price in summary["skipped"]:
+#             print(f"  - {t}: alloc ${alloc:.2f} < price ${price:.2f}")
+#     if summary["opportunistic"]:
+#         print(f"💡 Opportunistic buys: {len(summary['opportunistic'])}")
+#         for t, p, s in summary["opportunistic"]:
+#             print(f"  - {t}: {s:.3f} shares @ ${p:.2f}")
 
 
 # ─── 7) SAVE TRADE LOG ──────────────────────────────────────────────────────────
@@ -265,8 +265,8 @@ with open(PORTFOLIO_FILE, "w") as f:
 # ─── 10) PRINT STATUS ───────────────────────────────────────────────────────────
 print("\n✅ Trades executed.")
 print(f"Cash: ${new_summary['cash']:.2f}")
-print("Holdings:")
-for t, s in holdings.items():
-    print(f" • {t}: {s} shares  (live @ ${get_current_price(t):.2f})")
+# print("Holdings:")
+# for t, s in holdings.items():
+#     print(f" • {t}: {s} shares  (live @ ${get_current_price(t):.2f})")
 print(f"Portfolio total value: ${total_val:.2f}")
 print(f"History entries: {len(history)}")

@@ -1,7 +1,6 @@
 import json
 import os
 import yfinance as yf
-from datetime import datetime, date
 
 CACHE_FILE = "price_cache.json"
 
@@ -10,22 +9,10 @@ def fetch_and_cache_prices(tickers, period="60d", interval="1d", force=False): #
     Downloads price history for given tickers in batches, caches into JSON.
     Handles MultiIndex DataFrame and retries on rate limits.
     """
-    today_str = date.today().isoformat()
     # Load existing cache if present
     if os.path.exists(CACHE_FILE) and not force:
         with open(CACHE_FILE, 'r') as f:
             cache = json.load(f)
-        # Check if cache has data updated today
-        # Inspect first ticker's dates
-        for t in tickers:
-            dates = cache.get(t, {}).get('dates', [])
-            if dates and dates[-1] == today_str:
-                continue
-            else:
-                # stale or missing data, force refresh
-                force = True
-                break
-        if not force:
             return cache
 
     # Fetch historical data in a single call to yfinance

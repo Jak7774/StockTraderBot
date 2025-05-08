@@ -20,7 +20,7 @@ INITIAL_CASH     = 10_000
 ftse100 = pd.read_csv("ftse100_constituents.csv")
 UNIVERSE = [f"{s}.L" for s in ftse100["Symbol"].dropna().unique()]
 # Cache 60 days daily history for all symbols
-fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d")
+fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d", force=True) # Force = Ensure Latest values downloaded
 
 # ────────────────────────────────────────────────────────────────────────────────
 def init_portfolio():

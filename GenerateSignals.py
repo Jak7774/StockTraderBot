@@ -70,6 +70,7 @@ def last_signal(ticker):
     """Compute the MA crossover and stop-loss/profit signals for ticker."""
     df = df_from_cache(ticker)
     if df.empty or len(df) < LONG_W:
+        print(f"{ticker}: Insufficient data ({len(df)} rows)")
         return None, None
 
     df['Short_MA'] = df['Close'].rolling(SHORT_W).mean()
@@ -97,6 +98,8 @@ def last_signal(ticker):
         if current_price <= cb * (1 - STOP_LOSS_PCT) or \
            current_price >= cb * (1 + TAKE_PROFIT_PCT):
             return 'SELL', current_price
+
+    # print(f"{t}: signal={ma_sig}, price={current_price}") # For Debugging - Check if Signals
 
     # otherwise MA-based
     if ma_sig in ['BUY', 'SELL']:
