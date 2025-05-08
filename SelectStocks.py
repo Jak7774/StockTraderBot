@@ -1,6 +1,7 @@
 # SelectStocks.py
 
-import yfinance as yf
+#import yfinance as yf # One Cached Call in DataManager (reduce requests)
+from DataManager import load_cached_prices, get_current_price
 import pandas as pd
 import json
 from datetime import datetime, timedelta, date
@@ -25,42 +26,29 @@ except FileNotFoundError:
     holdings = set()
 
 # ─── 3) DOWNLOAD HISTORICAL DATA ────────────────────────────────────────────────
-end_date = datetime.today()
-start_date = end_date - timedelta(days=LOOKBACK_DAYS + 20)
-
-price_data = yf.download(
-    tickers=TICKERS,
-    start=start_date.strftime("%Y-%m-%d"),
-    end=end_date.strftime("%Y-%m-%d"),
-    progress=True,
-    auto_adjust=True,
-    group_by="ticker"
-)
+price_cache = load_cached_prices() # From DataManager
 
 # ─── 4) COMPUTE MOMENTUM ────────────────────────────────────────────────────────
 momentum = {}
 skipped = []
 
 for t in TICKERS:
-    try:
-        if t not in price_data.columns.levels[0]:
-            raise ValueError("No data downloaded")
+    # pull the list of daily closes from our JSON cache
+    closes = price_cache.get(t, {}).get("close", [])
+    # need at least LOOKBACK_DAYS+1 closes to compute momentum
+    if len(closes) < LOOKBACK_DAYS + 1:
+        skipped.append((t, "not enough history"))
+        continue
 
-        close = price_data[t]["Close"].dropna()
+    # oldest reference price is LOOKBACK_DAYS+1 ago
+    ref_price   = closes[-(LOOKBACK_DAYS + 1)]
+    final_price = closes[-1]
+    mom_pct     = (final_price / ref_price - 1) * 100
 
-        if len(close) < LOOKBACK_DAYS + 1:
-            raise ValueError("Not enough data")
-
-        ref_price = close.iloc[-(LOOKBACK_DAYS + 1)].item()
-        final_price = close.iloc[-1].item()
-        mom_pct = (final_price / ref_price - 1) * 100
-
-        momentum[t] = {
-            "momentum_pct": round(mom_pct, 2),
-            "window_used": f"{LOOKBACK_DAYS} trading days"
-        }
-    except Exception as e:
-        skipped.append((t, str(e)))
+    momentum[t] = {
+        "momentum_pct": round(mom_pct, 2),
+        "window_used": f"{LOOKBACK_DAYS} trading days"
+    }
 
 # ─── 5) RANK AND PICK TOP N ─────────────────────────────────────────────────────
 ranked = sorted(momentum.items(), key=lambda x: x[1]["momentum_pct"], reverse=True)

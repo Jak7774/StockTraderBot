@@ -5,6 +5,8 @@ import json
 import time
 import subprocess
 from datetime import date, datetime
+from DataManager import fetch_and_cache_prices
+import pandas as pd
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────────
 PORTFOLIO_FILE   = "portfolio_summary.json"
@@ -13,6 +15,14 @@ DAILY_SCREEN     = "daily_screen.json"
 LAST_SELECT_RUN  = "selectstocks_last_run.txt"
 INITIAL_CASH     = 10_000
 
+# ─── PRE-FETCH HISTORICAL DATA ─────────────────────────────────────────────────
+# Load universe same as SelectStocks
+ftse100 = pd.read_csv("ftse100_constituents.csv")
+UNIVERSE = [f"{s}.L" for s in ftse100["Symbol"].dropna().unique()]
+# Cache 60 days daily history for all symbols
+fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d")
+
+# ────────────────────────────────────────────────────────────────────────────────
 def init_portfolio():
     """Ensure portfolio_summary.json exists."""
     if not os.path.exists(PORTFOLIO_FILE):
@@ -37,30 +47,17 @@ def mark_select_ran():
         f.write(str(date.today()))
 
 def get_todays_sells():
-    """Return set of tickers SELLed today or added to deferred sells today."""
+    """Return set of tickers sold or deferred today."""
     today_str = str(date.today())
     sells = set()
-
-    # Check trades_log.json
     if os.path.exists(TRADE_LOG):
         with open(TRADE_LOG) as f:
             logs = json.load(f)
-        sells.update({
-            entry["ticker"]
-            for entry in logs
-            if entry["action"] == "SELL" and entry["date"] == today_str
-        })
-
-    # Check deferred_sells.json
+        sells.update({e["ticker"] for e in logs if e["action"]=="SELL" and e["date"]==today_str})
     if os.path.exists("deferred_sells.json"):
         with open("deferred_sells.json") as f:
             deferred = json.load(f)
-        sells.update({
-            ticker
-            for ticker, data in deferred.items()
-            if data.get("date_flagged") == today_str
-        })
-
+        sells.update({t for t,d in deferred.items() if d.get("date_flagged")==today_str})
     return sells
 
 def prune_sold_from_screen(sold_set):
@@ -101,34 +98,25 @@ def job():
     run_script("GenerateSignals.py")
     run_script("ExecuteTrades.py")
 
-    # 4) Check new sells from this run
-    sells_after = get_todays_sells()
-    new_sells = sells_after - sells_before
+    # 4) Handle new sells
+    new_sells = get_todays_sells() - sells_before
     if new_sells:
-        print(f"New sells detected this run: {new_sells}")
-
-        # 5) Prune those from today's screen
+        print(f"New sells detected: {new_sells}")
         prune_sold_from_screen(new_sells)
-
-        # 6) Rerun generate+execute on pruned universe
         run_script("GenerateSignals.py")
         run_script("ExecuteTrades.py")
-
-        # 7) Monitor deferred sells (for trending up stocks)
         run_script("MonitorDeferredSells.py")
     else:
         print("No new sells this run.")
 
-    # 7) Summarize trades
+    # 5) Summarize trades
     run_script("TradeSummary.py")
-
     print("=== Run complete ===")
 
+
 if __name__ == "__main__":
-    # Initial run
     job()
-    # Loop
-    # print("Scheduler: will run every 10 mins. Press Ctrl+C to stop.")
+    # Uncomment to schedule periodic runs
     # while True:
     #     time.sleep(600)
     #     job()

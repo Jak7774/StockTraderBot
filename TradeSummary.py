@@ -3,7 +3,8 @@
 import json
 from datetime import date, datetime, timedelta
 import pandas as pd
-import yfinance as yf
+#import yfinance as yf
+from DataManager import load_cached_prices, get_current_price
 import matplotlib.pyplot as plt
 
 LOG_FILE        = "trades_log.json"
@@ -55,20 +56,22 @@ for ticker, sub in df.groupby("ticker"):
     }
 
 # ─── 4) FETCH CURRENT PRICES ───────────────────────────────────────────────────
-tickers = list(summary.keys())
-if tickers:
-    data = yf.download(tickers, period="1d", auto_adjust=True, progress=False)["Close"].iloc[-1]
-    if isinstance(data, pd.Series):
-        prices = data.to_dict()
+price_cache = load_cached_prices()
+prices = {}
+for tkr in summary:
+    # try to pull last cached close
+    closes = price_cache.get(tkr, {}).get("close", [])
+    if closes:
+        prices[tkr] = float(closes[-1])
     else:
-        prices = {tickers[0]: float(data)}
-else:
-    prices = {}
+        # fallback to live quote
+        prices[tkr] = get_current_price(tkr) or 0.0
+
 
 # ─── 5) COMPUTE MARKET VALUES ───────────────────────────────────────────────────
 total_market_value = 0
 for tkr, info in summary.items():
-    price = prices.get(tkr, 0)
+    price = prices.get(tkr, 0.0)
     info["current_price"] = round(price, 2)
     info["market_value"]   = round(info["shares"] * price, 2)
     total_market_value    += info["market_value"]

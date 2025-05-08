@@ -5,3 +5,5 @@ trade_signals.json
 trade_summary.json
 trades_log.json
 deferred_sells.json
+price_cache.json
+__pycache__/DataManager.cpython-312.pyc

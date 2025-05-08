@@ -3,7 +3,8 @@
 import json
 import os
 from datetime import date, datetime
-import yfinance as yf
+#import yfinance as yf
+from DataManager import get_current_price
 
 # ─── 1) SETTINGS ────────────────────────────────────────────────────────────────
 PORTFOLIO_FILE = "portfolio_summary.json"
@@ -76,7 +77,7 @@ for tkr, info in sell_sigs.items():
         trade_log.append({
             "ticker": tkr,
             "action": "SELL",
-            "date":   str(datetime.date.today()),
+            "date":   str(date.today()),
             "price":  price,
             "shares": shares
         })
@@ -167,24 +168,15 @@ if buy_list:
             price = info["latest_price"]
 
             if ALLOW_FRACTIONAL:
-                shares = round(alloc / price, 6)
-                if shares < 0.001:
-                    summary["skipped"].append((t, alloc, price))
-                    continue
-                shares = round(shares, 3)
-                cost = shares * price
+                shares = round(alloc/price,6)
+                shares = round(shares,3) if shares>=0.001 else 0
             else:
-                shares = int(alloc // price)
-                if shares == 0:
-                    summary["skipped"].append((t, alloc, price))
-                    continue
-                cost = shares * price
-
-            if cost > cash:
-                summary["skipped"].append((t, alloc, price))
+                shares = int(alloc//price)
+            if shares<=0 or shares*price>cash:
+                summary['skipped'].append((t,alloc,price))
                 continue
 
-            cash -= cost
+            cash -= shares*price
             holdings[t] = round(holdings.get(t, 0) + shares, 3)
             trade_log.append({
                 "ticker": t,
@@ -196,74 +188,33 @@ if buy_list:
             summary["bought"].append((t, shares, price))
 
         # Opportunistic buys
-        price_map = {}
-        for t in holdings.keys() | set(buy_list):
-            tk = yf.Ticker(t)
-            lp = tk.fast_info.last_price
-            if lp and lp > 0:
-                price_map[t] = lp
+        price_map = {t:get_current_price(t) for t in set(holdings)|set(buy_list)}
 
         while True:
-            # Recompute total portfolio value before each iteration
-            total_val = cash
-            prices = {}
-            for t, shares in holdings.items():
-                lp = price_map.get(t)
-                if not lp:
-                    lp = yf.Ticker(t).fast_info.last_price or 0
-                    price_map[t] = lp
-                total_val += shares * lp
-
-            # Filter viable stocks by price and allocation constraint
-            viable = {}
-            for t, p in price_map.items():
-                if p == 0 or cash < (p if not ALLOW_FRACTIONAL else 0.01):
-                    continue
-                current_shares = holdings.get(t, 0)
-                current_val = current_shares * p
-                future_val = current_val + (p if not ALLOW_FRACTIONAL else cash)
-                future_alloc = future_val / total_val if total_val > 0 else 0
-                if future_alloc <= MAX_ALLOC:
-                    viable[t] = p
-
-            if not viable:
-                break
-
-            # Pick the stock with the best (lowest) price
-            pick, price = min(viable.items(), key=lambda kv: kv[1])
-
+            total_val = cash + sum(get_current_price(t)*s for t,s in holdings.items())
+            viable = {t:p for t,p in price_map.items() if p>0 and cash>=(0.01 if ALLOW_FRACTIONAL else p)}
+            if not viable: break
+            pick,price = min(viable.items(),key=lambda kv:kv[1])
             if ALLOW_FRACTIONAL:
-                max_invest = min(cash, (MAX_ALLOC * total_val) - holdings.get(pick, 0) * price)
-                shares = round(max_invest / price, 6)
-                if shares < 0.001:
-                    break
-                shares = round(shares, 3)
-                cost = shares * price
+                max_inv = min(cash,(MAX_ALLOC*total_val)-holdings.get(pick,0)*price)
+                shares = round(max_inv/price,3) if max_inv/price>=0.001 else 0
             else:
-                if price > cash:
-                    break
-                shares = 1
-                cost = price
-
-            if cost > cash:
-                break
-
-            cash -= cost
-            holdings[pick] = round(holdings.get(pick, 0) + shares, 3)
+                shares = 1 if price<=cash else 0
+            if shares<=0 or shares*price>cash: break
+            cash-=shares*price
+            holdings[pick]=round(holdings.get(pick,0)+shares,3)
             trade_log.append({
-                "ticker": pick,
-                "action": "BUY",
-                "date": str(datetime.date.today()),
-                "price": price,
-                "shares": shares
+                "ticker":pick,
+                "action":"BUY",
+                "date":str(date.today()),
+                "price":price,
+                "shares":shares
             })
-            summary["opportunistic"].append((pick, price, shares))
-
-
+            summary['opportunistic'].append((pick,price,shares))
     else:
-        summary["no_alloc"] = True
+        summary['no_alloc'] = True
 else:
-    summary["no_signals"] = True
+    summary['no_signals'] = True
 
 # ─── PRINT SUMMARY ──────────────────────────────────────────────────────────────
 print("\n=== Buy Summary ===")
@@ -292,11 +243,7 @@ with open(TRADES_LOG, "w") as f:
 
 # ─── 8) UPDATE PORTFOLIO VALUE & HISTORY ───────────────────────────────────────
 # Fetch live price via fast_info for current holdings
-total_val = cash
-for t, shares in holdings.items():
-    tk = yf.Ticker(t)
-    lp = tk.fast_info.last_price or 0
-    total_val += shares * lp
+total_val = cash + sum(get_current_price(t)*s for t,s in holdings.items())
 
 history.append({
     "datetime":    datetime.now().isoformat(),
@@ -320,6 +267,6 @@ print("\n✅ Trades executed.")
 print(f"Cash: ${new_summary['cash']:.2f}")
 print("Holdings:")
 for t, s in holdings.items():
-    print(f" • {t}: {s} shares  (live @ ${yf.Ticker(t).fast_info.last_price:.2f})")
+    print(f" • {t}: {s} shares  (live @ ${get_current_price(t):.2f})")
 print(f"Portfolio total value: ${total_val:.2f}")
 print(f"History entries: {len(history)}")

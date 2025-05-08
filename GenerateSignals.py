@@ -1,4 +1,5 @@
-import yfinance as yf
+#import yfinance as yf
+from DataManager import load_cached_prices, get_current_price
 import pandas as pd
 import json
 
@@ -54,57 +55,53 @@ buy_signals  = {}
 sell_signals = {}
 
 # ─── 4) TICKER DATA CACHE ───────────────────────────────────────────────────────
+price_cache = load_cached_prices()
 
-price_data_cache = {} # So Call YFinance Fewer Timess
+def df_from_cache(ticker):
+    data = price_cache.get(ticker)
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame({
+        'Close': data['close']
+    }, index=pd.to_datetime(data['dates']))
+    return df
 
 def last_signal(ticker):
-    """Fetch data and compute the latest MA-crossover signal."""
-    
-    # Determine frequency to use
-    # if USE_FAST_STRATEGY:
-    #     interval, period = FAST_INTERVAL, FAST_PERIOD
-    # else:
-
-    # 1) Fetch & cache price series
-    interval, period = "1d", "60d"
-    if ticker not in price_data_cache:
-        data = yf.download(ticker, period=period, interval=interval,
-                         auto_adjust=True, progress=False)
-        price_data_cache[ticker] = data
-    else:
-        data = price_data_cache[ticker]
-
-    if data.empty or len(data) < LONG_W:
+    """Compute the MA crossover and stop-loss/profit signals for ticker."""
+    df = df_from_cache(ticker)
+    if df.empty or len(df) < LONG_W:
         return None, None
 
-    # 3) Compute MAs & positions
-    data["Short_MA"] = data["Close"].rolling(SHORT_W).mean()
-    data["Long_MA"]  = data["Close"].rolling(LONG_W).mean()
-    data["Signal"]   = 0
-    data.loc[data.index[SHORT_W:], "Signal"] = (
-        data["Short_MA"].iloc[SHORT_W:] > data["Long_MA"].iloc[SHORT_W:]
+    df['Short_MA'] = df['Close'].rolling(SHORT_W).mean()
+    df['Long_MA']  = df['Close'].rolling(LONG_W).mean()
+    df['Signal']   = 0
+    df.loc[df.index[SHORT_W]:, 'Signal'] = (
+        df['Short_MA'].iloc[SHORT_W:] > df['Long_MA'].iloc[SHORT_W:]
     ).astype(int)
-    data["Position"] = data["Signal"].diff()
+    df['Position'] = df['Signal'].diff()
 
-    recent = data[data["Position"].isin([1, -1])]
+    # find last crossover
+    recent = df[df['Position'].isin([1, -1])]
     if recent.empty:
-        ma_sig = "HOLD"
-        price  = data["Close"].iloc[-1]
+        ma_sig = 'HOLD'
     else:
-        last    = recent.iloc[-1]
-        ma_sig  = "BUY" if last["Position"].item() == 1 else "SELL"
-        price   = last["Close"]
+        last = recent.iloc[-1]
+        ma_sig = 'BUY' if last['Position'] == 1 else 'SELL'
 
-    # 4) Apply stop-loss / take-profit if we own the ticker
+    # use current live price for signals
+    current_price = get_current_price(ticker)
+
+    # stop-loss / take-profit based on cost basis
     cb = cost_basis_map.get(ticker)
     if cb is not None:
-        if price.item() <= cb * (1 - STOP_LOSS_PCT):
-            return "SELL", price
-        if price.item() >= cb * (1 + TAKE_PROFIT_PCT):
-            return "SELL", price
+        if current_price <= cb * (1 - STOP_LOSS_PCT) or \
+           current_price >= cb * (1 + TAKE_PROFIT_PCT):
+            return 'SELL', current_price
 
-    # 5) Otherwise return the MA‐based signal
-    return ma_sig, float(price.iloc[0])
+    # otherwise MA-based
+    if ma_sig in ['BUY', 'SELL']:
+        return ma_sig, current_price
+    return None, current_price
 
 # ─── 5) CHECK BUY CANDIDATES ────────────────────────────────────────────────────
 for t in to_buy:
