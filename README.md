@@ -23,6 +23,7 @@ A lightweight Python bot for screening stocks, generating buy/sell signals using
 | `MonitorDeferredSells.py` | Monitors deferred sell candidates with positive momentum. |
 | `TradeSummary.py` | Builds a trade and portfolio summary, with performance comparison. |
 | `run_bot.py` | Main bot file that loads signals and executes trades. |
+|`run_log.json`| Log File each time run_bot is executed, useful log when schedule task |
 | `daily_screen.json` | Input file specifying tickers to consider buying or selling today. |
 | `trade_signals.json` | Output from `GenerateSignals.py`, listing current BUY/SELL candidates. |
 | `trades_log.json` | Persistent record of all executed trades. |
