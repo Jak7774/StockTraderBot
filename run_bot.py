@@ -1,6 +1,7 @@
 # run_bot.py
 
 import os
+import sys
 import json
 import time
 import subprocess
@@ -14,6 +15,9 @@ TRADE_LOG        = "trades_log.json"
 DAILY_SCREEN     = "daily_screen.json"
 LAST_SELECT_RUN  = "selectstocks_last_run.txt"
 INITIAL_CASH     = 10_000
+
+# Set the working directory to the folder where run_bot.py is located
+os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
 # ─── PRE-FETCH HISTORICAL DATA ─────────────────────────────────────────────────
 # Load universe same as SelectStocks
