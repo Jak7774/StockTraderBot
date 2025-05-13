@@ -10,6 +10,7 @@ from DataManager import fetch_and_cache_prices
 import pandas as pd
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────────
+RUN_LOG_FILE = "run_log.json"
 PORTFOLIO_FILE   = "portfolio_summary.json"
 TRADE_LOG        = "trades_log.json"
 DAILY_SCREEN     = "daily_screen.json"
@@ -27,6 +28,21 @@ UNIVERSE = [f"{s}.L" for s in ftse100["Symbol"].dropna().unique()]
 fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d", force=True) # Force = Ensure Latest values downloaded
 
 # ────────────────────────────────────────────────────────────────────────────────
+
+# Log each time bot runs
+def log_run(run_data):
+    """Append a run log entry to run_log.json."""
+    if os.path.exists(RUN_LOG_FILE):
+        with open(RUN_LOG_FILE) as f:
+            logs = json.load(f)
+    else:
+        logs = []
+
+    logs.append(run_data)
+
+    with open(RUN_LOG_FILE, "w") as f:
+        json.dump(logs, f, indent=2)
+
 def init_portfolio():
     """Ensure portfolio_summary.json exists."""
     if not os.path.exists(PORTFOLIO_FILE):
@@ -85,12 +101,16 @@ def run_script(name):
     subprocess.run(["python", name], check=True)
 
 def job():
+    start_time = datetime.now()
+    scripts_run = []
+    
     print(f"\n=== Bot run at {datetime.now().isoformat()} ===")
     init_portfolio()
 
     # 1) Daily screen once
     if not ran_select_today():
         run_script("SelectStocks.py")
+        scripts_run.append("SelectStocks")
         mark_select_ran()
     else:
         print("Skipping SelectStocks.py (already ran today)")
@@ -100,23 +120,38 @@ def job():
 
     # 3) Run generate+execute
     run_script("GenerateSignals.py")
+    scripts_run.append("GenerateSignals")
     run_script("ExecuteTrades.py")
+    scripts_run.append("ExecuteTrades")
 
     # 4) Handle new sells
     new_sells = get_todays_sells() - sells_before
     if new_sells:
         print(f"New sells detected: {new_sells}")
         run_script("MonitorDeferredSells.py")
+        scripts_run.append("NEW SELL - MonitorDeferredSells")
         prune_sold_from_screen(new_sells)
         run_script("GenerateSignals.py")
+        scripts_run.append("NEW SELL - GenerateSignals")
         run_script("ExecuteTrades.py")
+        scripts_run.append("NEW SELL - ExecuteTrades")
     else:
         print("No new sells this run.")
 
     # 5) Summarize trades
     run_script("TradeSummary.py")
+    scripts_run.append("TradeSummary")
+    end_time = datetime.now()
     print("=== Run complete ===")
 
+    # Log run
+    run_entry = {
+        "timestamp": start_time.isoformat(),
+        "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "scripts_run": scripts_run
+    }
+    log_run(run_entry)
 
 if __name__ == "__main__":
     job()
