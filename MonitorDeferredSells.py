@@ -52,7 +52,7 @@ def monitor_deferred():
             price = get_current_price(ticker)  # Fetch live price here
             if price < stock["latest_price"]:
                 # Price started falling, sell stock
-                sell(ticker, portfolio, trade_log, price, stock["latest_price"])
+                sell(ticker, portfolio, trade_log, price)
                 deferred.pop(ticker)
                 if not deferred:
                     print("All deferred sells processed. Exiting.")
@@ -62,7 +62,7 @@ def monitor_deferred():
                     return
             elif now.hour >= 15 and now.minute >= 50:
                 # Near market close, sell stock
-                sell(ticker, portfolio, trade_log, price, stock["latest_price"])
+                sell(ticker, portfolio, trade_log, price)
                 deferred.pop(ticker)
                 if not deferred:
                     print("All deferred sells processed. Exiting.")
