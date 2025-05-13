@@ -162,11 +162,17 @@ df = pd.DataFrame(history)
 df['datetime'] = pd.to_datetime(df['datetime'])
 df.set_index('datetime', inplace=True)
 
+# Calculate daily average total value and forward-fill missing days
+daily_avg = df['total_value'].resample('D').mean().ffill()
+
 # Plot total value over time
 plt.figure(figsize=(12, 6))
-plt.plot(df.index, df['total_value'], marker='o')
+# Scatter plot of all portfolio values
+plt.scatter(df.index, df['total_value'], color='blue', alpha=0.5, label='Hourly Portfolio Value')
+# Line plot of daily average
+plt.plot(daily_avg.index, daily_avg, color='red', linewidth=2, label='Daily Average Value')
 plt.title('Portfolio Total Value Over Time')
-plt.xlabel('Time')
+plt.xlabel('Date')
 plt.ylabel('Total Value (£)')
 plt.grid(True)
 plt.tight_layout()
