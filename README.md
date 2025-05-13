@@ -49,7 +49,7 @@ This bot uses a **Moving Average Crossover** method:
 Additional logic:
 - **Stop-loss**: Triggered if price drops 10% below cost basis.
 - **Take-profit**: Triggered if price rises 15% above cost basis.
-- **Deferred Selling**: If a stock is flagged for sell but still shows positive momentum, it's deferred.
+- **Deferred Selling**: If a stock is flagged for sell but still shows positive momentum, it's deferred and monitored for the rest of the day (sold either at first drop or at latest end of day). 
 
 ## 🔧 Setup
 
