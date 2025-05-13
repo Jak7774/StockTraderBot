@@ -102,10 +102,10 @@ def job():
     new_sells = get_todays_sells() - sells_before
     if new_sells:
         print(f"New sells detected: {new_sells}")
+        run_script("MonitorDeferredSells.py")
         prune_sold_from_screen(new_sells)
         run_script("GenerateSignals.py")
         run_script("ExecuteTrades.py")
-        run_script("MonitorDeferredSells.py")
     else:
         print("No new sells this run.")
 
