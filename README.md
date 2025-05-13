@@ -14,6 +14,7 @@ A lightweight Python bot for screening stocks, generating buy/sell signals using
 
 ## 🗂️ File Overview
 
+### Python Scripts
 | File | Description |
 |------|-------------|
 | `DataManager.py` | Handles price caching and efficient yfinance data retrieval. |
@@ -23,6 +24,10 @@ A lightweight Python bot for screening stocks, generating buy/sell signals using
 | `MonitorDeferredSells.py` | Monitors deferred sell candidates with positive momentum. |
 | `TradeSummary.py` | Builds a trade and portfolio summary, with performance comparison. |
 | `run_bot.py` | Main bot file that loads signals and executes trades. |
+
+### JSON Files
+| File | Description |
+|------|-------------|
 |`run_log.json`| Record each time run_bot is executed, useful log when schedule task |
 | `daily_screen.json` | Input file specifying tickers to consider buying or selling today. |
 | `trade_signals.json` | Output from `GenerateSignals.py`, listing current BUY/SELL candidates. |
