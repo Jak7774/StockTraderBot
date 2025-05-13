@@ -170,4 +170,8 @@ plt.xlabel('Time')
 plt.ylabel('Total Value (£)')
 plt.grid(True)
 plt.tight_layout()
-plt.show()
+
+# Show plot non-blocking, wait 10 seconds, then close
+plt.show(block=False)
+plt.pause(10)
+plt.close()
