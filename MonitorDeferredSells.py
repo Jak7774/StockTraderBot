@@ -43,8 +43,9 @@ def monitor_deferred():
     deferred = load_deferred()
     trade_log = load_trade_log()
     
+    i = 1 # Loop Printout
+    print(f"Monitoring {len(deferred)} deferred sells...")
     while deferred:
-        print(f"Monitoring {len(deferred)} deferred sells...")
         now = datetime.datetime.now()
 
         for ticker, stock in list(deferred.items()):
@@ -77,6 +78,14 @@ def monitor_deferred():
         save_portfolio(portfolio)
         save_trade_log(trade_log)
         time.sleep(600)  # Check every 10 minutes
+        
+        # Print Out Loop
+        if i % 10 == 0:
+            print(i, end='')  # Print the number (10, 20, ...) with no newline
+        else:
+            print('.', end='')  # Print a dot with no newline
+        i += 1
+
 
 def sell(ticker, portfolio, trade_log, price):
     shares = portfolio["holdings"].pop(ticker, 0)
