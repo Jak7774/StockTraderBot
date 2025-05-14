@@ -107,55 +107,69 @@ def job():
     print(f"\n=== Bot run at {datetime.now().isoformat()} ===")
     init_portfolio()
 
-    # 1) Daily screen once
-    if not ran_select_today():
-        run_script("SelectStocks.py")
-        scripts_run.append("SelectStocks")
-        mark_select_ran()
-    else:
-        print("Skipping SelectStocks.py (already ran today)")
+    try:
+        # 1) Daily screen once
+        if not ran_select_today():
+            run_script("SelectStocks.py")
+            scripts_run.append("SelectStocks")
+            mark_select_ran()
+        else:
+            print("Skipping SelectStocks.py (already ran today)")
 
-    # 2) How many sells have happened already today?
-    sells_before = get_todays_sells()
+        # 2) How many sells have happened already today?
+        sells_before = get_todays_sells()
 
-    # 3) Run generate+execute
-    run_script("GenerateSignals.py")
-    scripts_run.append("GenerateSignals")
-    run_script("ExecuteTrades.py")
-    scripts_run.append("ExecuteTrades")
-
-    # 4) Handle new sells
-    new_sells = get_todays_sells() - sells_before
-    if new_sells:
-        print(f"New sells detected: {new_sells}")
-        run_script("MonitorDeferredSells.py")
-        scripts_run.append("NEW SELL - MonitorDeferredSells")
-        prune_sold_from_screen(new_sells)
+        # 3) Run generate+execute
         run_script("GenerateSignals.py")
-        scripts_run.append("NEW SELL - GenerateSignals")
+        scripts_run.append("GenerateSignals")
         run_script("ExecuteTrades.py")
-        scripts_run.append("NEW SELL - ExecuteTrades")
-    else:
-        print("No new sells this run.")
+        scripts_run.append("ExecuteTrades")
 
-    # 5) Summarize trades
-    run_script("TradeSummary.py")
-    scripts_run.append("TradeSummary")
+        # 4) Handle new sells
+        new_sells = get_todays_sells() - sells_before
+        if new_sells:
+            print(f"New sells detected: {new_sells}")
+            run_script("MonitorDeferredSells.py")
+            scripts_run.append("NEW SELL - MonitorDeferredSells")
+            prune_sold_from_screen(new_sells)
+            run_script("GenerateSignals.py")
+            scripts_run.append("NEW SELL - GenerateSignals")
+            run_script("ExecuteTrades.py")
+            scripts_run.append("NEW SELL - ExecuteTrades")
+        else:
+            print("No new sells this run.")
+
+        # 5) Summarize trades
+        run_script("TradeSummary.py")
+        scripts_run.append("TradeSummary")
+        end_time = datetime.now()
+        print("=== Run complete ===")
+        return scripts_run
+    except Exception as e:
+        raise e
+
+if __name__ == "__main__":
+    start_time = datetime.now()
+    success = True
+    error_message = None
+    scripts_run = []
+
+    try:
+        scripts_run = job()
+    except Exception as e:
+        success = False
+        error_message = str(e)
+        print(f"ERROR: {error_message}")
+
     end_time = datetime.now()
-    print("=== Run complete ===")
 
-    # Log run
     run_entry = {
         "timestamp": start_time.isoformat(),
         "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
         "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "success": success,
+        "error_message": error_message,
         "scripts_run": scripts_run
     }
-    log_run(run_entry)
 
-if __name__ == "__main__":
-    job()
-    # Uncomment to schedule periodic runs
-    # while True:
-    #     time.sleep(600)
-    #     job()
+    log_run(run_entry)
