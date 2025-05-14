@@ -61,7 +61,7 @@ Additional logic:
 
 2. Install requirements (if applicable):
    ```bash
-   pip install yfinance pandas matplotlib
+   pip install yfinance pandas matplotlib portalocker
    ```
 
 3. Run the bot:
