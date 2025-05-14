@@ -3,10 +3,40 @@ import datetime
 import json
 import yfinance as yf
 import os
+import sys
+import portalocker # Lock File so only run one instance
+import logging
+
+# ───────── Script Variables ───────────────────────────────────────────────────────────────────
 
 PORTFOLIO_FILE = "portfolio_summary.json"
 TRADE_LOG_FILE = "trades_log.json"
 DEFERRED_FILE = "deferred_sells.json"
+
+# IF running on Windows and ANSI sequences don’t work, enable ANSI support like this
+if os.name == 'nt':
+    os.system('')
+
+# Set up logging
+LOG_FILE = "monitor_deferred.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# ───────── Lock Script (single dynamic instance) ──────────────────────────────────────────────
+
+def is_already_running(lock_file_path="monitor.lock"):
+    lock_file = open(lock_file_path, 'w')
+    try:
+        portalocker.lock(lock_file, portalocker.LOCK_EX | portalocker.LOCK_NB)
+        return False, lock_file
+    except portalocker.LockException:
+        return True, None
 
 def load_portfolio():
     if not os.path.exists(PORTFOLIO_FILE):
@@ -42,10 +72,20 @@ def monitor_deferred():
     portfolio = load_portfolio()
     deferred = load_deferred()
     trade_log = load_trade_log()
+
+    seen_tickers = set(deferred.keys())
     
-    i = 1 # Loop Printout
     print(f"Monitoring {len(deferred)} deferred sells...")
     while deferred:
+
+        # Reload deferred list in case new tickers were added by run_bot.py
+        updated_deferred = load_deferred()
+        new_tickers = set(updated_deferred.keys()) - seen_tickers
+        deferred = updated_deferred
+
+        if new_tickers:
+            seen_tickers.update(new_tickers)
+
         now = datetime.datetime.now()
 
         for ticker, stock in list(deferred.items()):
@@ -59,6 +99,8 @@ def monitor_deferred():
                     save_deferred(deferred)
                     save_portfolio(portfolio)
                     save_trade_log(trade_log)
+                    if os.path.exists("monitor_started.txt"):
+                        os.remove("monitor_started.txt")
                     return
             elif now.hour >= 15 and now.minute >= 50:
                 # Near market close, sell stock
@@ -69,6 +111,8 @@ def monitor_deferred():
                     save_deferred(deferred)
                     save_portfolio(portfolio)
                     save_trade_log(trade_log)
+                    if os.path.exists("monitor_started.txt"):
+                        os.remove("monitor_started.txt")
                     return
             else:
                 if price > stock["latest_price"]:
@@ -77,14 +121,34 @@ def monitor_deferred():
         save_deferred(deferred)
         save_portfolio(portfolio)
         save_trade_log(trade_log)
-        time.sleep(600)  # Check every 10 minutes
         
-        # Print Out Loop
-        if i % 10 == 0:
-            print(i, end='')  # Print the number (10, 20, ...) with no newline
-        else:
-            print('.', end='')  # Print a dot with no newline
-        i += 1
+        countdown = 600  # 10 minutes
+        print(f"\nTime to next check = {countdown}s")  # Initial print to fix the line in place
+
+        while countdown > 0:
+            time.sleep(50)
+            countdown -= 50
+
+            # Refresh deferred list and check for new tickers
+            updated_deferred = load_deferred()
+            new_tickers = set(updated_deferred.keys()) - seen_tickers
+            if new_tickers:
+                seen_tickers.update(new_tickers)
+
+                # Clear the countdown line
+                sys.stdout.write("\033[F")  # Move up
+                sys.stdout.write("\r")      # Start of line
+                sys.stdout.write(" " * 80 + "\n")  # Clear line
+                sys.stdout.flush()
+
+                print(f"New deferred tickers detected: {', '.join(sorted(new_tickers))}")
+
+            # Move cursor up one line and clear it
+            sys.stdout.write("\033[F")  # Move up
+            sys.stdout.write("\r")      # Move to line start
+            sys.stdout.write(f"Time to next check = {countdown}s{' ' * 10}\n")  # Overwrite with padding
+            sys.stdout.flush()
+
 
 
 def sell(ticker, portfolio, trade_log, price):
@@ -140,4 +204,12 @@ def get_current_price(ticker):
     return price or 0
 
 if __name__ == "__main__":
-    monitor_deferred()
+    already_running, lock_file = is_already_running()
+    if already_running:
+        print("Another instance of MonitorDeferredSells is already running. Exiting.")
+        sys.exit(0)
+    
+    try:
+        monitor_deferred()
+    finally:
+        lock_file.close()
