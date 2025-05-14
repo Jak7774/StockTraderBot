@@ -15,6 +15,7 @@ PORTFOLIO_FILE   = "portfolio_summary.json"
 TRADE_LOG        = "trades_log.json"
 DAILY_SCREEN     = "daily_screen.json"
 LAST_SELECT_RUN  = "selectstocks_last_run.txt"
+MONITOR_FLAG = "monitor_started.txt"
 INITIAL_CASH     = 10_000
 
 # Set the working directory to the folder where run_bot.py is located
@@ -129,8 +130,23 @@ def job():
         new_sells = get_todays_sells() - sells_before
         if new_sells:
             print(f"New sells detected: {new_sells}")
-            run_script("MonitorDeferredSells.py")
-            scripts_run.append("NEW SELL - MonitorDeferredSells")
+
+            # Only start MonitorDeferredSells.py if it hasn't already been started today
+            monitor_already_started = (
+                os.path.exists(MONITOR_FLAG) and
+                open(MONITOR_FLAG).read().strip() == str(date.today())
+            )
+
+            if not monitor_already_started:
+                print("Launching MonitorDeferredSells.py for the first time today...")
+                subprocess.Popen(["python", "MonitorDeferredSells.py"])
+                with open(MONITOR_FLAG, "w") as f:
+                    f.write(str(date.today()))
+                scripts_run.append("NEW SELL - MonitorDeferredSells STARTED")
+            else:
+                print("MonitorDeferredSells.py already running today.")
+
+
             prune_sold_from_screen(new_sells)
             run_script("GenerateSignals.py")
             scripts_run.append("NEW SELL - GenerateSignals")
