@@ -180,6 +180,7 @@ if __name__ == "__main__":
     end_time = datetime.now()
 
     run_entry = {
+        "initiator": os.path.basename(__file__),
         "timestamp": start_time.isoformat(),
         "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
         "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),

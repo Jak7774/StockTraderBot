@@ -8,7 +8,7 @@ import portalocker # Lock File so only run one instance
 import logging
 
 # ───────── Script Variables ───────────────────────────────────────────────────────────────────
-
+RUN_LOG_FILE = "run_log.json"
 PORTFOLIO_FILE = "portfolio_summary.json"
 TRADE_LOG_FILE = "trades_log.json"
 DEFERRED_FILE = "deferred_sells.json"
@@ -27,6 +27,33 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+# ───────── Logging of Script Performance (meta-data) ─────────────────────────────────────────
+
+def load_run_log():
+    if not os.path.exists(RUN_LOG_FILE):
+        return []
+    with open(RUN_LOG_FILE) as f:
+        return json.load(f)
+
+def save_run_log(log):
+    with open(RUN_LOG_FILE, "w") as f:
+        json.dump(log, f, indent=2)
+
+def log_run_entry(start_time, end_time, success=True, error_message=None, scripts_run=None):
+    log = load_run_log()
+    run_entry = {
+        "initiator": os.path.basename(__file__),
+        "timestamp": start_time.isoformat(),
+        "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "success": success,
+        "error_message": error_message,
+        "scripts_run": scripts_run or []
+    }
+    log.append(run_entry)
+    save_run_log(log)
+
 
 # ───────── Lock Script (single dynamic instance) ──────────────────────────────────────────────
 
@@ -208,8 +235,20 @@ if __name__ == "__main__":
     if already_running:
         print("Another instance of MonitorDeferredSells is already running. Exiting.")
         sys.exit(0)
-    
+
+    start_time = datetime.datetime.now()
+    scripts_run = ["MonitorDeferredSells - MONITOR"]
+    error_message = None
+    success = True
+
     try:
         monitor_deferred()
+    except Exception as e:
+        success = False
+        error_message = str(e)
+        logging.exception("An error occurred in MonitorDeferredSells")
     finally:
+        scripts_run.append("MonitorDeferredSells - END")
+        end_time = datetime.datetime.now()
+        log_run_entry(start_time, end_time, success=success, error_message=error_message, scripts_run=scripts_run)
         lock_file.close()
