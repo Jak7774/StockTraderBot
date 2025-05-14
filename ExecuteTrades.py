@@ -5,6 +5,7 @@ import os
 from datetime import date, datetime
 #import yfinance as yf
 from DataManager import get_current_price
+import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
 
 # ─── 1) SETTINGS ────────────────────────────────────────────────────────────────
 PORTFOLIO_FILE = "portfolio_summary.json"
@@ -17,6 +18,15 @@ INITIAL_CASH   = 10_000
 MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
 ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
+
+# Tempfile Writing (save issues with concurrency)
+def atomic_write_json(data, filepath):
+    """Write JSON to a temporary file, then replace the original file atomically."""
+    dir_name = os.path.dirname(os.path.abspath(filepath)) or "."
+    with tempfile.NamedTemporaryFile('w', delete=False, dir=dir_name, suffix=".tmp") as tmp:
+        json.dump(data, tmp, indent=2)
+        tempname = tmp.name
+    os.replace(tempname, filepath)
 
 # ─── 2) LOAD OR INIT PORTFOLIO ──────────────────────────────────────────────────
 if os.path.exists(PORTFOLIO_FILE):
@@ -84,8 +94,7 @@ for tkr, info in sell_sigs.items():
         print(f"Sold {shares} of {tkr} @ ${price:.2f}")
 
 # Save updated deferred sells
-with open(DEFERRED_SELLS_FILE, "w") as f:
-    json.dump(deferred_sells, f, indent=2)
+atomic_write_json(deferred_sells, DEFERRED_SELLS_FILE)
 print(f"\n📄 Deferred sells updated in {DEFERRED_SELLS_FILE} ({len(deferred_sells)} tickers)")
 
 # ─── 5B) AUTO-CLEAN OLD OR INVALID DEFERRED SELLS ───────────────────────────────
@@ -115,9 +124,7 @@ for tkr, record in deferred_sells.items():
         print(f"🧹 Removing {tkr} from deferred sells ({' and '.join(reason)})")
 
 # Save cleaned deferred sells
-with open(DEFERRED_SELLS_FILE, "w") as f:
-    json.dump(cleaned_deferred_sells, f, indent=2)
-
+atomic_write_json(cleaned_deferred_sells, DEFERRED_SELLS_FILE)
 print(f"\n🧽 Deferred sells cleaned: {len(cleaned_deferred_sells)} active tickers remain")
 
 # ─── 6) EXECUTE BUYS (MOMENTUM WEIGHTED + CAP + MIN + GREEDY) ──────────────────
