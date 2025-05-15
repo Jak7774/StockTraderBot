@@ -17,17 +17,6 @@ DEFERRED_FILE = "deferred_sells.json"
 if os.name == 'nt':
     os.system('')
 
-# Set up logging
-LOG_FILE = "monitor_deferred.log"
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
 # ───────── Logging of Script Performance (meta-data) ─────────────────────────────────────────
 
 def load_run_log():
@@ -239,8 +228,12 @@ if __name__ == "__main__":
         success = False
         error_message = str(e)
         logging.exception("An error occurred in MonitorDeferredSells")
+        if os.path.exists("monitor_started.txt"):
+            os.remove("monitor_started.txt")
     finally:
         scripts_run.append("MonitorDeferredSells - END")
         end_time = datetime.datetime.now()
         log_run_entry(start_time, end_time, success=success, error_message=error_message, scripts_run=scripts_run)
         lock_file.close()
+        if os.path.exists("monitor_started.txt"):
+            os.remove("monitor_started.txt")
