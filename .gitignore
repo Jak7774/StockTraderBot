@@ -8,3 +8,6 @@ deferred_sells.json
 price_cache.json
 __pycache__/DataManager.cpython-312.pyc
 run_log.json
+monitor.lock
+monitor_deferred.log
+monitor_started.txt
