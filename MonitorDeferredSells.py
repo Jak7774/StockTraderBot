@@ -103,7 +103,19 @@ def monitor_deferred():
     seen_tickers = set(deferred.keys())
     
     print(f"Monitoring {len(deferred)} deferred sells...")
+    
+    # initial values for help function
+    loop_count = 0
+    countdown = 600  
+
+    # helper function (print timer and loop number)
+    def print_status_line():
+        msg = f"Total Check = {loop_count} / Time to next check = {countdown}s"
+        sys.stdout.write(f"\r{msg}{' ' * 10}")
+        sys.stdout.flush()
+
     while deferred:
+        loop_count += 1
 
         # Reload deferred list in case new tickers were added by run_bot.py
         updated_deferred = load_deferred()
@@ -112,16 +124,20 @@ def monitor_deferred():
 
         if new_tickers:
             seen_tickers.update(new_tickers)
+            sys.stdout.write("\n")  # move to next line to not overwrite status
+            print(f"New deferred tickers detected: {', '.join(sorted(new_tickers))}")
+            print_status_line()  # reprint status line at bottom
 
         now = datetime.datetime.now()
 
         for ticker, stock in list(deferred.items()):
             price = get_current_price(ticker)  # Fetch live price here
-            if price < stock["latest_price"]:
-                # Price started falling, sell stock
+            if price < stock["latest_price"] or (now.hour >= 15 and now.minute >= 50):
                 sell(ticker, portfolio, trade_log, price)
                 deferred.pop(ticker)
+
                 if not deferred:
+                    sys.stdout.write("\n")
                     print("All deferred sells processed. Exiting.")
                     save_deferred(deferred)
                     save_portfolio(portfolio)
@@ -129,54 +145,30 @@ def monitor_deferred():
                     if os.path.exists("monitor_started.txt"):
                         os.remove("monitor_started.txt")
                     return
-            elif now.hour >= 15 and now.minute >= 50:
-                # Near market close, sell stock
-                sell(ticker, portfolio, trade_log, price)
-                deferred.pop(ticker)
-                if not deferred:
-                    print("All deferred sells processed. Exiting.")
-                    save_deferred(deferred)
-                    save_portfolio(portfolio)
-                    save_trade_log(trade_log)
-                    if os.path.exists("monitor_started.txt"):
-                        os.remove("monitor_started.txt")
-                    return
-            else:
-                if price > stock["latest_price"]:
-                    stock["latest_price"] = price
+
+            elif price > stock["latest_price"]:
+                stock["latest_price"] = price
 
         save_deferred(deferred)
         save_portfolio(portfolio)
         save_trade_log(trade_log)
         
         countdown = 600  # 10 minutes
-        print(f"\nTime to next check = {countdown}s")  # Initial print to fix the line in place
 
         while countdown > 0:
+            print_status_line()
+
             time.sleep(50)
             countdown -= 50
 
-            # Refresh deferred list and check for new tickers
+            # Check for new deferred tickers again
             updated_deferred = load_deferred()
             new_tickers = set(updated_deferred.keys()) - seen_tickers
             if new_tickers:
                 seen_tickers.update(new_tickers)
-
-                # Clear the countdown line
-                sys.stdout.write("\033[F")  # Move up
-                sys.stdout.write("\r")      # Start of line
-                sys.stdout.write(" " * 80 + "\n")  # Clear line
-                sys.stdout.flush()
-
+                sys.stdout.write("\n")
                 print(f"New deferred tickers detected: {', '.join(sorted(new_tickers))}")
-
-            # Move cursor up one line and clear it
-            sys.stdout.write("\033[F")  # Move up
-            sys.stdout.write("\r")      # Move to line start
-            sys.stdout.write(f"Time to next check = {countdown}s{' ' * 10}\n")  # Overwrite with padding
-            sys.stdout.flush()
-
-
+                print_status_line()  # ensure the status line is reprinted at bottom
 
 def sell(ticker, portfolio, trade_log, price):
     shares = portfolio["holdings"].pop(ticker, 0)
