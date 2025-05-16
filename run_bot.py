@@ -136,11 +136,7 @@ def job():
 
         if new_sells or not monitor_already_started:
 
-            print(f"New sells detected: {new_sells}")
-
             # Only start MonitorDeferredSells.py if it hasn't already been started today
-            
-
             if not monitor_already_started:
                 print("Launching MonitorDeferredSells.py for the first time today...")
                 subprocess.Popen(["python", "MonitorDeferredSells.py"])
