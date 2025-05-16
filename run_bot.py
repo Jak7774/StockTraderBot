@@ -138,7 +138,7 @@ def job():
 
             # Only start MonitorDeferredSells.py if it hasn't already been started today
             if not monitor_already_started:
-                print("Launching MonitorDeferredSells.py for the first time today...")
+                print("Launching instance of MonitorDeferredSells.py and locking file...")
                 subprocess.Popen(["python", "MonitorDeferredSells.py"])
                 with open(MONITOR_FLAG, "w") as f:
                     f.write(str(date.today()))
