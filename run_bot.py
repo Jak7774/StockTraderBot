@@ -16,6 +16,7 @@ TRADE_LOG        = "trades_log.json"
 DAILY_SCREEN     = "daily_screen.json"
 LAST_SELECT_RUN  = "selectstocks_last_run.txt"
 MONITOR_FLAG = "monitor_started.txt"
+DEFERRED_SELLS_FILE = "deferred_sells.json"
 INITIAL_CASH     = 10_000
 
 # Set the working directory to the folder where run_bot.py is located
@@ -128,14 +129,17 @@ def job():
 
         # 4) Handle new sells
         new_sells = get_todays_sells() - sells_before
-        if new_sells:
-            print(f"New sells detected: {new_sells}")
-
-            # Only start MonitorDeferredSells.py if it hasn't already been started today
-            monitor_already_started = (
+        monitor_already_started = (
                 os.path.exists(MONITOR_FLAG) and
                 open(MONITOR_FLAG).read().strip() == str(date.today())
             )
+
+        if new_sells or not monitor_already_started:
+
+            print(f"New sells detected: {new_sells}")
+
+            # Only start MonitorDeferredSells.py if it hasn't already been started today
+            
 
             if not monitor_already_started:
                 print("Launching MonitorDeferredSells.py for the first time today...")
@@ -146,14 +150,15 @@ def job():
             else:
                 print("MonitorDeferredSells.py already running today.")
 
-
-            prune_sold_from_screen(new_sells)
-            run_script("GenerateSignals.py")
-            scripts_run.append("NEW SELL - GenerateSignals")
-            run_script("ExecuteTrades.py")
-            scripts_run.append("NEW SELL - ExecuteTrades")
+            if new_sells:
+                print(f"New sells detected: {new_sells}, rerun for BUYS")
+                prune_sold_from_screen(new_sells)
+                run_script("GenerateSignals.py")
+                scripts_run.append("NEW SELL - GenerateSignals")
+                run_script("ExecuteTrades.py")
+                scripts_run.append("NEW SELL - ExecuteTrades")
         else:
-            print("No new sells this run.")
+            print("No new sells and no need to start MonitorDeferredSells.")
 
         # 5) Summarize trades
         run_script("TradeSummary.py")
