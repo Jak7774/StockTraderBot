@@ -87,7 +87,7 @@ for tkr, info in sell_sigs.items():
         trade_log.append({
             "ticker": tkr,
             "action": "SELL",
-            "date":   str(date.today()),
+            "date":   datetime.datetime.now().isoformat(),
             "price":  price,
             "shares": shares
         })

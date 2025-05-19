@@ -166,7 +166,7 @@ def sell(ticker, portfolio, trade_log, price):
         trade_log.append({
             "ticker": ticker,
             "action": "SELL",
-            "date": str(datetime.date.today()),
+            "date": datetime.datetime.now().isoformat(),
             "price": price,
             "shares": shares
         })
