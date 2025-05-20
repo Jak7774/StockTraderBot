@@ -10,92 +10,94 @@ S.No.,Company Name,Symbol
 9,Astrazeneca PLC ,AZN
 10,Auto Trader Group PLC ,AUTO
 11,Aviva PLC ,AV
-12,BAE Systems PLC ,BA
-13,Barclays PLC ,BARC
-14,Barratt Redrow PLC ,BTRW
-15,Beazley PLC ,BEZ
-16,Berkeley Group Holdings (The) PLC,BKG
-17,BP PLC ,BP
-18,British American Tobacco PLC ,BATS
-19,British Land Co PLC ,BLND
-20,BT Group PLC ,BT-A
-21,Bunzl PLC ,BNZL
-22,Centrica PLC,CNA
-23,Coca-Cola HBC AG,CCH
-24,Compass Group PLC,CPG
-25,Convatec Group PLC ,CTEC
-26,Croda International PLC ,CRDA
-27,DCC PLC ,DCC
-28,Diageo PLC ,DGE
-29,Diploma PLC,DPLM
-30,Easyjet PLC ,EZJ
-31,Endeavour Mining PLC ,EDV
-32,Entain PLC,ENT
-33,Experian PLC,EXPN
-34,F&C Investment Trust PLC ,FCIT
-35,Fresnillo PLC ,FRES
-36,Games Workshop Group PLC ,GAW
-37,Glencore PLC ,GLEN
-38,GSK PLC ,GSK
-39,Haleon PLC ,HLN
-40,Halma PLC ,HLMA
-41,Hargreaves Lansdown PLC,HL
-42,Hikma Pharmaceuticals PLC ,HIK
-43,Hiscox Ld ,HSX
-44,Howden Joinery Group PLC ,HWDN
-45,HSBC Hldgs PLC ,HSBA
-46,IMI PLC ,IMI
-47,Imperial Brands PLC ,IMB
-48,Informa PLC ,INF
-49,Intercontinental Hotels Group PLC ,IHG
-50,Intermediate Capital Group PLC ,ICG
-51,Intertek Group PLC ,ITRK
-52,Intl Consolidated Airlines Group Sa,IAG
-53,JD Sports Fashion PLC,JD
-54,Kingfisher PLC,KGF
-55,Land Securities Group PLC ,LAND
-56,Legal & General Group PLC ,LGEN
-57,Lloyds Banking Group PLC ,LLOY
-58,London Stock Exchange Group PLC ,LSEG
-59,Londonmetric Property PLC ,LMP
-60,M&G PLC,MNG
-61,Marks & Spencer Group PLC ,MKS
-62,Melrose Industries PLC ,MRO
-63,Mondi PLC ,MNDI
-64,National Grid PLC ,NG
-65,Natwest Group PLC ,NWG
-66,Next PLC ,NXT
-67,Pearson PLC ,PSON
-68,Pershing Square Holdings Ltd ,PSH
-69,Persimmon PLC ,PSN
-70,Phoenix Group Holdings PLC ,PHNX
-71,Prudential PLC ,PRU
-72,Reckitt Benckiser Group PLC ,RKT
-73,RELX PLC ,REL
-74,Rentokil Initial PLC ,RTO
-75,Rightmove PLC ,RMV
-76,Rio Tinto PLC,RIO
-77,Rolls-Royce Holdings PLC ,RR
-78,Sage Group PLC ,SGE
-79,Sainsbury(J) PLC ,SBRY
-80,Schroders PLC ,SDR
-81,Scottish Mortgage Inv Tst PLC,SMT
-82,Segro PLC ,SGRO
-83,Severn Trent PLC ,SVT
-84,Shell PLC,SHEL
-85,Smith & Nephew PLC ,SN
-86,Smith (Ds) PLC ,SMDS
-87,Smiths Group PLC ,SMIN
-88,Spirax Group PLC ,SPX
-89,SSE PLC ,SSE
-90,St.James'S Place PLC ,STJ
-91,Standard Chartered PLC ,STAN
-92,Taylor Wimpey PLC ,TW
-93,Tesco PLC ,TSCO
-94,Unilever PLC,ULVR
-95,Unite Group PLC ,UTG
-96,United Utilities Group PLC ,UU
-97,Vodafone Group PLC ,VOD
-98,Weir Group PLC ,WEIR
-99,Whitbread PLC ,WTB
-100,WPP PLC,WPP
+12,Babcock International Group PLC,BAB
+13,BAE Systems PLC ,BA
+14,Barclays PLC ,BARC
+15,Barratt Redrow PLC ,BTRW
+16,Beazley PLC ,BEZ
+17,Berkeley Group Holdings (The) PLC,BKG
+18,BP PLC ,BP
+19,British American Tobacco PLC ,BATS
+20,British Land Co PLC ,BLND
+21,BT Group PLC ,BT-A
+22,Bunzl PLC ,BNZL
+23,Centrica PLC,CNA
+24,Coca-Cola EuroPacific Partners PLC,CCEP
+25,Coca-Cola HBC AG,CCH
+26,Compass Group PLC,CPG
+27,Convatec Group PLC ,CTEC
+28,Croda International PLC ,CRDA
+29,DCC PLC ,DCC
+30,Diageo PLC ,DGE
+31,Diploma PLC,DPLM
+32,Easyjet PLC ,EZJ
+33,Endeavour Mining PLC ,EDV
+34,Entain PLC,ENT
+35,Experian PLC,EXPN
+36,F&C Investment Trust PLC ,FCIT
+37,Fresnillo PLC ,FRES
+38,Games Workshop Group PLC ,GAW
+39,Glencore PLC ,GLEN
+40,GSK PLC ,GSK
+41,Haleon PLC ,HLN
+42,Halma PLC ,HLMA
+43,Hargreaves Lansdown PLC,HL
+44,Hikma Pharmaceuticals PLC ,HIK
+45,Hiscox Ld ,HSX
+46,Howden Joinery Group PLC ,HWDN
+47,HSBC Hldgs PLC ,HSBA
+48,IMI PLC ,IMI
+49,Imperial Brands PLC ,IMB
+50,Informa PLC ,INF
+51,Intercontinental Hotels Group PLC ,IHG
+52,Intermediate Capital Group PLC ,ICG
+53,Intertek Group PLC ,ITRK
+54,Intl Consolidated Airlines Group Sa,IAG
+55,JD Sports Fashion PLC,JD
+56,Kingfisher PLC,KGF
+57,Land Securities Group PLC ,LAND
+58,Legal & General Group PLC ,LGEN
+59,Lloyds Banking Group PLC ,LLOY
+60,London Stock Exchange Group PLC ,LSEG
+61,Londonmetric Property PLC ,LMP
+62,M&G PLC,MNG
+63,Marks & Spencer Group PLC ,MKS
+64,Melrose Industries PLC ,MRO
+65,Mondi PLC ,MNDI
+66,National Grid PLC ,NG
+67,Natwest Group PLC ,NWG
+68,Next PLC ,NXT
+69,Pearson PLC ,PSON
+70,Pershing Square Holdings Ltd ,PSH
+71,Persimmon PLC ,PSN
+72,Phoenix Group Holdings PLC ,PHNX
+73,Polar Capital Technology PLC,PCT
+74,Prudential PLC ,PRU
+75,Reckitt Benckiser Group PLC ,RKT
+76,RELX PLC ,REL
+77,Rentokil Initial PLC ,RTO
+78,Rightmove PLC ,RMV
+79,Rio Tinto PLC,RIO
+80,Rolls-Royce Holdings PLC ,RR
+81,Sage Group PLC ,SGE
+82,Sainsbury(J) PLC ,SBRY
+83,Schroders PLC ,SDR
+84,Scottish Mortgage Inv Tst PLC,SMT
+85,Segro PLC ,SGRO
+86,Severn Trent PLC ,SVT
+87,Shell PLC,SHEL
+88,Smith & Nephew PLC ,SN
+89,Smiths Group PLC ,SMIN
+90,Spirax Group PLC ,SPX
+91,SSE PLC ,SSE
+92,St.James'S Place PLC ,STJ
+93,Standard Chartered PLC ,STAN
+94,Taylor Wimpey PLC ,TW
+95,Tesco PLC ,TSCO
+96,Unilever PLC,ULVR
+97,Unite Group PLC ,UTG
+98,United Utilities Group PLC ,UU
+99,Vodafone Group PLC ,VOD
+100,Weir Group PLC ,WEIR
+101,Whitbread PLC ,WTB
+102,WPP PLC,WPP

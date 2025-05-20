@@ -6,6 +6,7 @@ import os
 import sys
 import portalocker # Lock File so only run one instance
 import logging
+import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
 
 # ───────── Script Variables ───────────────────────────────────────────────────────────────────
 RUN_LOG_FILE = "run_log.json"
@@ -17,17 +18,35 @@ DEFERRED_FILE = "deferred_sells.json"
 if os.name == 'nt':
     os.system('')
 
+# Helper Function - Load JSON but check if already in use & retry
+def load_json_with_retry(filepath, retries=5, delay=5):
+    for attempt in range(retries):
+        try:
+            with open(filepath) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError, OSError) as e:
+            print(f"⚠️ Error reading {filepath}: {e}. Retrying in {delay}s...")
+            time.sleep(delay)
+    raise RuntimeError(f"❌ Failed to load {filepath} after {retries} attempts.")
+
+# Helper function to save JSON files
+def atomic_write_json(data, filepath):
+    """Write JSON to a temporary file, then replace the original file atomically."""
+    dir_name = os.path.dirname(os.path.abspath(filepath)) or "."
+    with tempfile.NamedTemporaryFile('w', delete=False, dir=dir_name, suffix=".tmp") as tmp:
+        json.dump(data, tmp, indent=2)
+        tempname = tmp.name
+    os.replace(tempname, filepath)
+
 # ───────── Logging of Script Performance (meta-data) ─────────────────────────────────────────
 
 def load_run_log():
     if not os.path.exists(RUN_LOG_FILE):
         return []
-    with open(RUN_LOG_FILE) as f:
-        return json.load(f)
+    return load_json_with_retry(RUN_LOG_FILE)
 
 def save_run_log(log):
-    with open(RUN_LOG_FILE, "w") as f:
-        json.dump(log, f, indent=2)
+    atomic_write_json(log, RUN_LOG_FILE)
 
 def log_run_entry(start_time, end_time, success=True, error_message=None, scripts_run=None):
     log = load_run_log()
@@ -57,32 +76,26 @@ def is_already_running(lock_file_path="monitor.lock"):
 def load_portfolio():
     if not os.path.exists(PORTFOLIO_FILE):
         return {"cash": 0, "holdings": {}, "history": []}
-    with open(PORTFOLIO_FILE) as f:
-        return json.load(f)
+    return load_json_with_retry(PORTFOLIO_FILE)
 
 def save_portfolio(portfolio):
-    with open(PORTFOLIO_FILE, "w") as f:
-        json.dump(portfolio, f, indent=2)
+    atomic_write_json(portfolio, PORTFOLIO_FILE)
 
 def load_deferred():
     if not os.path.exists(DEFERRED_FILE):
         return []
-    with open(DEFERRED_FILE) as f:
-        return json.load(f)
+    return load_json_with_retry(DEFERRED_FILE)
 
 def save_deferred(deferred):
-    with open(DEFERRED_FILE, "w") as f:
-        json.dump(deferred, f, indent=2)
+    atomic_write_json(deferred, DEFERRED_FILE)
 
 def load_trade_log():
     if not os.path.exists(TRADE_LOG_FILE):
         return []
-    with open(TRADE_LOG_FILE) as f:
-        return json.load(f)
+    return load_json_with_retry(TRADE_LOG_FILE)
 
 def save_trade_log(trade_log):
-    with open(TRADE_LOG_FILE, "w") as f:
-        json.dump(trade_log, f, indent=2)
+    atomic_write_json(trade_log, TRADE_LOG_FILE)
 
 def monitor_deferred():
     portfolio = load_portfolio()

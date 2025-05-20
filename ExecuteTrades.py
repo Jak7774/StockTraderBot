@@ -19,6 +19,18 @@ MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
 ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
 
+# Load File - Check if currently being written to
+def load_json_with_retry(filepath, retries=5, delay=5):
+    """Attempt to load JSON from a file, retrying on failure."""
+    for attempt in range(retries):
+        try:
+            with open(filepath) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError, OSError) as e:
+            print(f"⚠️ Error reading {filepath}: {e}. Retrying in {delay}s...")
+            time.sleep(delay)
+    raise RuntimeError(f"❌ Failed to load {filepath} after {retries} attempts.")
+
 # Tempfile Writing (save issues with concurrency)
 def atomic_write_json(data, filepath):
     """Write JSON to a temporary file, then replace the original file atomically."""
@@ -30,8 +42,7 @@ def atomic_write_json(data, filepath):
 
 # ─── 2) LOAD OR INIT PORTFOLIO ──────────────────────────────────────────────────
 if os.path.exists(PORTFOLIO_FILE):
-    with open(PORTFOLIO_FILE) as f:
-        summary = json.load(f)
+    summary = load_json_with_retry(PORTFOLIO_FILE)
     cash     = summary.get("cash", INITIAL_CASH)
     holdings = summary.get("holdings", {})
     history  = summary.get("history", [])
@@ -41,19 +52,16 @@ else:
     history  = []
 
 # ─── 3) LOAD SIGNALS & SCREEN ───────────────────────────────────────────────────
-with open(SIGNALS_FILE) as f:
-    sigs = json.load(f)
+sigs = load_json_with_retry(SIGNALS_FILE)
 buy_sigs  = sigs.get("buy_signals", {})
 sell_sigs = sigs.get("sell_signals", {})
 
-with open(SCREEN_FILE) as f:
-    screen = json.load(f)
+screen = load_json_with_retry(SCREEN_FILE)
 momentum_map = screen.get("momentum", {})
 
 # ─── 4) LOAD OR INIT TRADE LOG ──────────────────────────────────────────────────
 if os.path.exists(TRADES_LOG):
-    with open(TRADES_LOG) as f:
-        trade_log = json.load(f)
+    trade_log = load_json_with_retry(TRADES_LOG)
 else:
     trade_log = []
 
@@ -61,8 +69,7 @@ else:
 
 # Load existing deferred sells (if any)
 if os.path.exists(DEFERRED_SELLS_FILE):
-    with open(DEFERRED_SELLS_FILE) as f:
-        deferred_sells = json.load(f)
+    deferred_sells = load_json_with_retry(DEFERRED_SELLS_FILE)
 else:
     deferred_sells = {}
 
@@ -245,8 +252,7 @@ else:
 
 
 # ─── 7) SAVE TRADE LOG ──────────────────────────────────────────────────────────
-with open(TRADES_LOG, "w") as f:
-    json.dump(trade_log, f, indent=2)
+atomic_write_json(trade_log, TRADES_LOG)
 
 # ─── 8) UPDATE PORTFOLIO VALUE & HISTORY ───────────────────────────────────────
 # Fetch live price via fast_info for current holdings
@@ -266,8 +272,8 @@ new_summary = {
     "holdings": holdings,
     "history":  history
 }
-with open(PORTFOLIO_FILE, "w") as f:
-    json.dump(new_summary, f, indent=2)
+
+atomic_write_json(new_summary, PORTFOLIO_FILE)
 
 # ─── 10) PRINT STATUS ───────────────────────────────────────────────────────────
 print("\n✅ Trades executed.")
