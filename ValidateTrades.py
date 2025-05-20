@@ -19,12 +19,13 @@ violation_counts = defaultdict(int)
 # ── Load trades and sort ────────────────────────────────────────────
 with open('trades_log.json') as f:
     trades = json.load(f)
-trades.sort(key=lambda x: x['date'])
+trades.sort(key=lambda x: datetime.fromisoformat(x['date']))
 
 # ── Process trades (with rounding) ─────────────────────────────────
 for trade in trades:
     trade_date = trade['date']
-    dt = datetime.strptime(trade_date, '%Y-%m-%d')
+    # Date is mix of date and datetime
+    dt = datetime.fromisoformat(trade_date)
     action = trade['action']
     ticker = trade['ticker']
     quantity = trade['shares']
@@ -81,7 +82,7 @@ for i, trade in enumerate(trades):
 # Future trades
 today_dt = datetime.today()
 for trade in trades:
-    dt = datetime.strptime(trade['date'], '%Y-%m-%d')
+    dt = datetime.fromisoformat(trade_date)
     if dt > today_dt:
         violations.append({
             'type': 'FUTURE TRADE',
@@ -164,9 +165,3 @@ plt.show()
 # ── Plot violation counts ─────────────────────────────────────────────
 if violation_counts == 0:
     print("🎉 No violations detected.")
-
-
-print("\n🔍 Investigating CASH MISMATCH on 2025-05-19")
-for t in trades:
-    if t["date"] == "2025-05-19":
-        print(trade)

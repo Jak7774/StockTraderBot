@@ -11,3 +11,6 @@ run_log.json
 monitor.lock
 monitor_deferred.log
 monitor_started.txt
+violations_log.json
+violations_log.json
+violations_log.json
