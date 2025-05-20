@@ -133,18 +133,33 @@ def job():
                 os.path.exists(MONITOR_FLAG) and
                 open(MONITOR_FLAG).read().strip() == str(date.today())
             )
+        
+        # Check if deferred_sells.json is non-empty
+        def is_deferred_sells_nonempty():
+            if not os.path.exists(DEFERRED_SELLS_FILE):
+                return False
+            try:
+                with open(DEFERRED_SELLS_FILE, 'r') as f:
+                    data = json.load(f)
+                    return bool(data)  # True if data is not empty (e.g., list or dict with content)
+            except (json.JSONDecodeError, ValueError):
+                return False  # File is invalid or empty
 
         if new_sells or not monitor_already_started:
 
-            # Only start MonitorDeferredSells.py if it hasn't already been started today
+            # Only start MonitorDeferredSells.py if it hasn't already been started today (and deferred_sells not empty)
             if not monitor_already_started:
-                print("Launching instance of MonitorDeferredSells.py and locking file...")
-                subprocess.Popen(["python", "MonitorDeferredSells.py"])
-                with open(MONITOR_FLAG, "w") as f:
-                    f.write(str(date.today()))
-                scripts_run.append("NEW SELL - MonitorDeferredSells STARTED")
+                if is_deferred_sells_nonempty():
+                    print("Launching instance of MonitorDeferredSells.py and locking file...")
+                    subprocess.Popen(["python", "MonitorDeferredSells.py"])
+                    with open(MONITOR_FLAG, "w") as f:
+                        f.write(str(date.today()))
+                    scripts_run.append("NEW SELL - MonitorDeferredSells STARTED")
             else:
-                print("MonitorDeferredSells.py already running today.")
+                if not is_deferred_sells_nonempty():
+                    print("No new deferred sells detected")
+                else:
+                    print("MonitorDeferredSells.py already running today.")
 
             if new_sells:
                 print(f"New sells detected: {new_sells}, rerun for BUYS")
