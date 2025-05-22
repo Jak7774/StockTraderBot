@@ -1,5 +1,5 @@
 # ExecuteTrades.py
-
+import time
 import json
 import os
 from datetime import date, datetime
@@ -59,6 +59,10 @@ sell_sigs = sigs.get("sell_signals", {})
 screen = load_json_with_retry(SCREEN_FILE)
 momentum_map = screen.get("momentum", {})
 
+# ─── 3B) CREATE PRICE CACHE ─────────────────────────────────────────────────────
+tickers_needed = set(buy_sigs) | set(sell_sigs) | set(holdings)
+price_cache = {t: get_current_price(t) for t in tickers_needed}
+
 # ─── 4) LOAD OR INIT TRADE LOG ──────────────────────────────────────────────────
 if os.path.exists(TRADES_LOG):
     trade_log = load_json_with_retry(TRADES_LOG)
@@ -94,11 +98,14 @@ for tkr, info in sell_sigs.items():
         trade_log.append({
             "ticker": tkr,
             "action": "SELL",
-            "date":   datetime.datetime.now().isoformat(),
+            "date":   datetime.now().isoformat(),
             "price":  price,
             "shares": shares
         })
         print(f"Sold {shares} of {tkr} @ ${price:.2f}")
+    else:
+        print(f"⚠️ Tried to sell {tkr}, but it's not in holdings.")
+
 
 # Save updated deferred sells
 atomic_write_json(deferred_sells, DEFERRED_SELLS_FILE)
@@ -202,7 +209,7 @@ if buy_list:
             summary["bought"].append((t, shares, price))
 
         # Opportunistic buys
-        price_map = {t:get_current_price(t) for t in set(holdings)|set(buy_list)}
+        price_map = {t:price_cache[t] for t in set(holdings)|set(buy_list)}
 
         while True:
             total_val = cash + sum(get_current_price(t)*s for t,s in holdings.items())
@@ -256,7 +263,7 @@ atomic_write_json(trade_log, TRADES_LOG)
 
 # ─── 8) UPDATE PORTFOLIO VALUE & HISTORY ───────────────────────────────────────
 # Fetch live price via fast_info for current holdings
-total_val = cash + sum(get_current_price(t)*s for t,s in holdings.items())
+total_val = cash + sum(price_cache[t]*s for t,s in holdings.items())
 
 history.append({
     "datetime":    datetime.now().isoformat(),

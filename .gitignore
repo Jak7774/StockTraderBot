@@ -12,3 +12,4 @@ monitor.lock
 monitor_deferred.log
 monitor_started.txt
 violations_log.json
+*.tmp

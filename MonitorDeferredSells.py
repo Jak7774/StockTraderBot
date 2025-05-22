@@ -160,8 +160,8 @@ def monitor_deferred():
         while countdown > 0:
             print_status_line()
 
-            time.sleep(50)
-            countdown -= 50
+            time.sleep(10)
+            countdown -= 10
 
             # Check for new deferred tickers again
             updated_deferred = load_deferred()
