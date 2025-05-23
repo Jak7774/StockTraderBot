@@ -76,10 +76,11 @@ def get_todays_sells():
         with open(TRADE_LOG) as f:
             logs = json.load(f)
         sells.update({e["ticker"] for e in logs if e["action"]=="SELL" and e["date"]==today_str})
-    if os.path.exists("deferred_sells.json"):
-        with open("deferred_sells.json") as f:
-            deferred = json.load(f)
-        sells.update({t for t,d in deferred.items() if d.get("date_flagged")==today_str})
+    # Exclude Deferred Sells - As Not Been Sold!
+    # if os.path.exists("deferred_sells.json"):
+    #     with open("deferred_sells.json") as f:
+    #         deferred = json.load(f)
+    #     sells.update({t for t,d in deferred.items() if d.get("date_flagged")==today_str})
     return sells
 
 def prune_sold_from_screen(sold_set):
@@ -155,11 +156,10 @@ def job():
                     with open(MONITOR_FLAG, "w") as f:
                         f.write(str(date.today()))
                     scripts_run.append("NEW SELL - MonitorDeferredSells STARTED")
-            else:
-                if not is_deferred_sells_nonempty():
-                    print("No new deferred sells detected")
                 else:
-                    print("MonitorDeferredSells.py already running today.")
+                    print("No new deferred sells detected")
+            else:
+                print("MonitorDeferredSells.py already running today.")
 
             if new_sells:
                 print(f"New sells detected: {new_sells}, rerun for BUYS")
