@@ -146,28 +146,35 @@ def job():
             except (json.JSONDecodeError, ValueError):
                 return False  # File is invalid or empty
 
-        if new_sells or not monitor_already_started:
+        monitor_started = False
 
-            # Only start MonitorDeferredSells.py if it hasn't already been started today (and deferred_sells not empty)
-            if not monitor_already_started:
-                if is_deferred_sells_nonempty():
-                    print("Launching instance of MonitorDeferredSells.py and locking file...")
-                    subprocess.Popen(["python", "MonitorDeferredSells.py"])
-                    with open(MONITOR_FLAG, "w") as f:
-                        f.write(str(date.today()))
-                    scripts_run.append("NEW SELL - MonitorDeferredSells STARTED")
-                else:
-                    print("No new deferred sells detected")
-            else:
-                print("MonitorDeferredSells.py already running today.")
+        if not monitor_already_started and is_deferred_sells_nonempty():
+            print("Launching MonitorDeferredSells.py...")
+            subprocess.Popen(["python", "MonitorDeferredSells.py"])
+            with open(MONITOR_FLAG, "w") as f:
+                f.write(str(date.today()))
+            scripts_run.append("DEFERRED - MonitorDeferredSells STARTED")
+            monitor_started = True
 
-            if new_sells:
-                print(f"New sells detected: {new_sells}, rerun for BUYS")
-                prune_sold_from_screen(new_sells)
-                run_script("GenerateSignals.py")
-                scripts_run.append("NEW SELL - GenerateSignals")
-                run_script("ExecuteTrades.py")
-                scripts_run.append("NEW SELL - ExecuteTrades")
+        # CASE 1: Real sells today → proceed immediately
+        if new_sells:
+            print("Detected real sells for today.")
+            run_script("GenerateSignals.py")
+            scripts_run.append("NEW SELL - GenerateSignals")
+            run_script("ExecuteTrades.py")
+            scripts_run.append("NEW SELL - ExecuteTrades")
+
+        # CASE 2: No real sells, but deferred monitor was started → wait, then act
+        elif monitor_started:
+            print("Waiting for MonitorDeferredSells.py to finish...")
+            while os.path.exists(MONITOR_FLAG):
+                time.sleep(60)
+            print("MonitorDeferredSells.py has finished.")
+
+            run_script("GenerateSignals.py")
+            scripts_run.append("AFTER MONITOR - GenerateSignals")
+            run_script("ExecuteTrades.py")
+            scripts_run.append("AFTER MONITOR - ExecuteTrades")
         else:
             print("No new sells and no need to start MonitorDeferredSells.")
 
