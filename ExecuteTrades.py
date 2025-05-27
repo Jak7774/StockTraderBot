@@ -4,7 +4,7 @@ import json
 import os
 from datetime import date, datetime
 #import yfinance as yf
-from DataManager import get_current_price
+from DataManager import get_current_price, get_closes  
 import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
 
 # ─── 1) SETTINGS ────────────────────────────────────────────────────────────────
@@ -78,12 +78,20 @@ else:
     deferred_sells = {}
 
 for tkr, info in sell_sigs.items():
+    
+    # Momentum Only Updated Daily
     momentum = momentum_map.get(tkr, 0)
 
-    if momentum > 0:
+    # Get today's current and last close price
+    current_price = get_current_price(tkr)
+    closes = get_closes(tkr)
+    last_close_price = closes[-1] if closes else 0
+
+    if current_price > last_close_price * 1.01: # Delay if >1% threshold increase
+        percent_change = ((current_price - last_close_price) / last_close_price) * 100
         # Defer selling stocks still trending upward
         deferred_sells[tkr] = {
-            "latest_price": info["latest_price"],
+            "latest_price": current_price,
             "momentum": momentum,
             "date_flagged": str(date.today())
         }
@@ -93,7 +101,7 @@ for tkr, info in sell_sigs.items():
     # Otherwise, sell normally
     if tkr in holdings:
         shares = holdings.pop(tkr)
-        price  = info["latest_price"]
+        price  = current_price
         cash  += shares * price
         trade_log.append({
             "ticker": tkr,
@@ -105,7 +113,6 @@ for tkr, info in sell_sigs.items():
         print(f"Sold {shares} of {tkr} @ ${price:.2f}")
     else:
         print(f"⚠️ Tried to sell {tkr}, but it's not in holdings.")
-
 
 # Save updated deferred sells
 atomic_write_json(deferred_sells, DEFERRED_SELLS_FILE)
