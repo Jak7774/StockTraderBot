@@ -7,12 +7,22 @@ import sys
 import portalocker # Lock File so only run one instance
 import logging
 import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
+from DataManager import get_intraday_prices
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 # ───────── Script Variables ───────────────────────────────────────────────────────────────────
 RUN_LOG_FILE = "run_log.json"
 PORTFOLIO_FILE = "portfolio_summary.json"
 TRADE_LOG_FILE = "trades_log.json"
 DEFERRED_FILE = "deferred_sells.json"
+
+# === Sell Strategy Thresholds ===
+SLOPE_THRESHOLD = -0.005       # Downward slope threshold (e.g., -0.005 means ~0.5% drop per interval)
+DROP_FROM_PEAK_PCT = 2.5       # % drop from recent peak that triggers a sell even if slope is ambiguous
+PRICE_WINDOW = 10              # Number of intraday price points to use (~last 50 minutes if 5-min interval)
+MIN_DROP_BELOW_PEAK_PCT = 0.5  # Minimum % drop below peak to consider a downtrend actionable
+
 
 # IF running on Windows and ANSI sequences don’t work, enable ANSI support like this
 if os.name == 'nt':
@@ -97,6 +107,8 @@ def load_trade_log():
 def save_trade_log(trade_log):
     atomic_write_json(trade_log, TRADE_LOG_FILE)
 
+# ───────── Main Function ───────────────────────────────────────────────────────────────────
+
 def monitor_deferred():
     portfolio = load_portfolio()
     deferred = load_deferred()
@@ -133,9 +145,28 @@ def monitor_deferred():
         now = datetime.datetime.now()
 
         for ticker, stock in list(deferred.items()):
-            price = get_current_price(ticker)  # Fetch live price here
-            if price < stock["latest_price"] or (now.hour >= 15 and now.minute >= 50):
-                sell(ticker, portfolio, trade_log, price)
+            intraday = get_intraday_prices(ticker)
+            if len(intraday) < 5:
+                continue  # Not enough data yet
+
+            prices = np.array(intraday[-PRICE_WINDOW:])  # last 10 prices (~last 50 mins if 5-min interval)
+            X = np.arange(len(prices)).reshape(-1, 1)
+            y = np.array(prices).reshape(-1, 1)
+
+            model = LinearRegression().fit(X, y)
+            slope = model.coef_[0][0]
+            current_price = prices[-1]
+            peak_price = max(prices)
+            drop_from_peak_pct = ((peak_price - current_price) / peak_price) * 100
+
+            time_close = now.hour >= 15 and now.minute >= 50
+            downtrend = slope < SLOPE_THRESHOLD  
+            large_drop = drop_from_peak_pct > DROP_FROM_PEAK_PCT
+
+            min_drop_factor = 1 - (MIN_DROP_BELOW_PEAK_PCT / 100)
+            
+            if (downtrend and current_price < peak_price * min_drop_factor) or large_drop or time_close:
+                sell(ticker, portfolio, trade_log, current_price)
                 deferred.pop(ticker)
 
                 if not deferred:
@@ -148,8 +179,8 @@ def monitor_deferred():
                         os.remove("monitor_started.txt")
                     return
 
-            elif price > stock["latest_price"]:
-                stock["latest_price"] = price
+            elif current_price > stock["latest_price"]:
+                stock["latest_price"] = current_price
 
         save_deferred(deferred)
         save_portfolio(portfolio)
@@ -223,6 +254,8 @@ def get_current_price(ticker):
             price = 0
 
     return price or 0
+
+# ───────── Execute Script ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     already_running, lock_file = is_already_running()
