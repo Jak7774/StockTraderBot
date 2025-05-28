@@ -209,7 +209,7 @@ if buy_list:
             trade_log.append({
                 "ticker": t,
                 "action": "BUY",
-                "date": str(date.today()),
+                "date": datetime.now().isoformat(),
                 "price": price,
                 "shares": shares
             })
@@ -234,7 +234,7 @@ if buy_list:
             trade_log.append({
                 "ticker":pick,
                 "action":"BUY",
-                "date":str(date.today()),
+                "date": datetime.now().isoformat(),
                 "price":price,
                 "shares":shares
             })
@@ -281,7 +281,7 @@ history.append({
 
 # ─── 9) SAVE UPDATED PORTFOLIO SUMMARY ─────────────────────────────────────────
 new_summary = {
-    "date":     str(date.today()),
+    "date":     datetime.now().isoformat(),
     "cash":     round(cash, 2),
     "holdings": holdings,
     "history":  history
