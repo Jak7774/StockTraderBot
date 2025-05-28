@@ -4,8 +4,10 @@ import json
 import os
 from datetime import date, datetime
 #import yfinance as yf
-from DataManager import get_current_price, get_closes  
+from DataManager import get_current_price, get_closes, get_intraday_prices 
 import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 # ─── 1) SETTINGS ────────────────────────────────────────────────────────────────
 PORTFOLIO_FILE = "portfolio_summary.json"
@@ -18,6 +20,7 @@ INITIAL_CASH   = 10_000
 MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
 ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
+TREND_SLOPE_THRESHOLD = 0.05  # Change to suit trends
 
 # Load File - Check if currently being written to
 def load_json_with_retry(filepath, retries=5, delay=5):
@@ -71,6 +74,27 @@ else:
 
 # ─── 5) EXECUTE SELLS (WITH DEFERRED IF MOMENTUM POSITIVE) ──────────────────────
 
+def is_trending_up(intraday_prices):
+    """
+    Estimate trend using linear regression.
+    intraday_prices: list of (timestamp, price) tuples
+    Returns True if the slope indicates upward trend.
+    """
+    if len(intraday_prices) < 5:
+        return False  # not enough data
+
+    # Convert times to numeric values (minutes since open)
+    times = np.array([(dt - intraday_prices[0][0]).total_seconds() / 60 for dt, _ in intraday_prices]).reshape(-1, 1)
+    prices = np.array([p for _, p in intraday_prices])
+
+    # Linear regression
+    model = LinearRegression()
+    model.fit(times, prices)
+    slope = model.coef_[0]
+
+    return slope >= TREND_SLOPE_THRESHOLD
+
+
 # Load existing deferred sells (if any)
 if os.path.exists(DEFERRED_SELLS_FILE):
     deferred_sells = load_json_with_retry(DEFERRED_SELLS_FILE)
@@ -87,7 +111,10 @@ for tkr, info in sell_sigs.items():
     closes = get_closes(tkr)
     last_close_price = closes[-1] if closes else 0
 
-    if current_price > last_close_price * 1.01: # Delay if >1% threshold increase
+    # Optional: Load intraday price data
+    intraday_prices = get_intraday_prices(tkr)  # List of (datetime, price)
+
+    if current_price > last_close_price * 1.01 and is_trending_up(intraday_prices): # Delay if >1% threshold increase and slope trending up
         percent_change = ((current_price - last_close_price) / last_close_price) * 100
         # Defer selling stocks still trending upward
         deferred_sells[tkr] = {
