@@ -26,7 +26,7 @@ except FileNotFoundError:
     holdings = set()
 
 # ─── 3) DOWNLOAD HISTORICAL DATA ────────────────────────────────────────────────
-price_cache = load_cached_prices() # From DataManager
+price_cache = load_cached_prices(data_type="daily") # From DataManager
 
 # ─── 4) COMPUTE MOMENTUM ────────────────────────────────────────────────────────
 momentum = {}
