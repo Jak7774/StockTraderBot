@@ -55,6 +55,11 @@ for ticker, sub in df.groupby("ticker"):
         "cost_basis":  round(cost_basis, 2) if cost_basis is not None else None
     }
 
+# Find last buy and sell timestamps
+df['date'] = pd.to_datetime(df['date'], format='ISO8601')
+last_buy_time = df[df["action"] == "BUY"]["date"].max()
+last_sell_time = df[df["action"] == "SELL"]["date"].max()
+
 # ─── 4) FETCH CURRENT PRICES ───────────────────────────────────────────────────
 price_cache = load_cached_prices()
 prices = {}
@@ -133,6 +138,8 @@ delta_last_str = f"{change_since_last:+.2f}"
 print(f"Trade summary for {output['date']}:")
 print(f" • Total trades executed: {output['total_trades']}")
 print(f" • Buys = {output['buys']} / Sells = {output['sells']}")
+print(f" • Last BUY:              {last_buy_time.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(last_buy_time) else 'N/A'}")
+print(f" • Last SELL:             {last_sell_time.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(last_sell_time) else 'N/A'}")
 print(f" • Cash remaining:        ${output['cash_remaining']:.2f}")
 print(f" • Market value:          ${output['market_value']:.2f}")
 print(f" • TOTAL portfolio value: {total_color}${output['total_value']:.2f} "
