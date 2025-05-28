@@ -55,7 +55,7 @@ buy_signals  = {}
 sell_signals = {}
 
 # ─── 4) TICKER DATA CACHE ───────────────────────────────────────────────────────
-price_cache = load_cached_prices()
+price_cache = load_cached_prices(data_type="daily")
 
 def df_from_cache(ticker):
     data = price_cache.get(ticker)
