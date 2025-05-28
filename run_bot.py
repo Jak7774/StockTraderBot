@@ -70,17 +70,20 @@ def mark_select_ran():
 
 def get_todays_sells():
     """Return set of tickers sold or deferred today."""
-    today_str = str(date.today())
+    today = date.today()
     sells = set()
     if os.path.exists(TRADE_LOG):
         with open(TRADE_LOG) as f:
             logs = json.load(f)
-        sells.update({e["ticker"] for e in logs if e["action"]=="SELL" and e["date"]==today_str})
-    # Exclude Deferred Sells - As Not Been Sold!
-    # if os.path.exists("deferred_sells.json"):
-    #     with open("deferred_sells.json") as f:
-    #         deferred = json.load(f)
-    #     sells.update({t for t,d in deferred.items() if d.get("date_flagged")==today_str})
+        for entry in logs:
+            if entry["action"] == "SELL":
+                try:
+                    entry_date = datetime.fromisoformat(entry["date"]).date()
+                except ValueError:
+                    # Fallback if the date is not ISO format
+                    entry_date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
+                if entry_date == today:
+                    sells.add(entry["ticker"])
     return sells
 
 def prune_sold_from_screen(sold_set):
