@@ -1,7 +1,8 @@
 import json
 import os
 import yfinance as yf
-import datetime
+from datetime import datetime
+import pandas as pd
 
 CACHE_FILE = "price_cache.json"
 
@@ -70,11 +71,19 @@ def fetch_and_cache_prices(tickers, period="60d", interval="1d", intraday=False,
                     auto_adjust=True,
                     progress=False
                 )
+
                 if not df_intra.empty:
-                    cache[t]['intraday'] = [
-                        [ts.isoformat(), round(row['Close'], 2)]
-                        for ts, row in df_intra.iterrows()
+                    close_prices = df_intra[('Close', t)]
+                    intraday_data = [
+                        (str(ts), round(float(close), 2))
+                        for ts, close in zip(df_intra.index, close_prices)
+                        if not pd.isna(close)
                     ]
+
+                    cache[t]['intraday'] = {
+                        'datetime': [entry[0] for entry in intraday_data],
+                        'price':    [entry[1] for entry in intraday_data]
+                    }
             except Exception as e:
                 print(f"[Warning] Could not fetch intraday for {t}: {e}")
 
@@ -90,9 +99,17 @@ def get_intraday_prices(ticker, cache=None):
     Returns intraday prices [(datetime, close)] from cache.
     """
     if cache is None:
-        cache = load_cached_prices(data_type="intraday")
-    data = cache.get(ticker, {}).get('intraday', [])
-    return [(datetime.fromisoformat(ts), price) for ts, price in data]
+        data = load_cached_prices(data_type="intraday")
+        if ticker in data:
+            inner_data = data[ticker]
+            if 'datetime' in inner_data and 'price' in inner_data:
+                return [(datetime.fromisoformat(ts), price) for ts, price in zip(inner_data['datetime'], inner_data['price'])]
+            else:
+                print("Missing keys in inner data:", inner_data)
+        else:
+            print(f"Ticker '{ticker}' not found in data:", data)
+
+        return []
 
 def load_cached_prices(data_type="both"):
     """
@@ -130,7 +147,7 @@ def get_closes(ticker, cache=None):
     """
     if cache is None:
         cache = load_cached_prices(data_type="daily")
-    return cache.get(ticker, {}).get('daily', {}).get('close', [])
+    return cache.get(ticker, {}).get('close', [])
 
 def get_current_price(ticker):
     t = yf.Ticker(ticker)
@@ -140,8 +157,8 @@ def get_current_price(ticker):
         return t.info.get('regularMarketPrice')
 
 # For Debugging
-# import pandas as pd
-# ftse100 = pd.read_csv("ftse100_constituents.csv")
-# UNIVERSE = [f"{s}.L" for s in ftse100["Symbol"].dropna().unique()]
-# # Cache 60 days daily history for all symbols
-# fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d")
+#ftse100 = pd.read_csv("ftse100_constituents.csv")
+#UNIVERSE = [f"{s}.L" for s in ftse100["Symbol"].dropna().unique()]
+# Cache 60 days daily history for all symbols
+#fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d")
+#fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d", force=True, intraday=True) # Force = Ensure Latest values downloaded
