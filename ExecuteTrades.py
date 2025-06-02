@@ -240,6 +240,7 @@ if buy_list:
                 "price": price,
                 "shares": shares
             })
+            print(f"Bought {shares} of {t} @ ${price:.2f}")
             summary["bought"].append((t, shares, price))
 
         # Opportunistic buys
@@ -265,6 +266,7 @@ if buy_list:
                 "price":price,
                 "shares":shares
             })
+            print(f"Bought {shares} of {pick} @ ${price:.2f} (opportunistic)")
             summary['opportunistic'].append((pick,price,shares))
     else:
         summary['no_alloc'] = True
