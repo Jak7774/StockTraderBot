@@ -39,6 +39,10 @@ A lightweight Python bot for screening stocks, generating buy/sell signals using
 | `portfolio_summary.json` | Tracks portfolio holdings, cash, and history over time. |
 | `trade_summary.json` | Latest portfolio valuation and trade summary. |
 | `price_cache.json` | Cached price history used to avoid repeat calls to yfinance. |
+
+### Text Files
+| File | Description |
+|------|-------------|
 | `selectstocks_last_run.txt` | Tracks the last run date of the screening process. |
 | `stocktickers_last_run.txt` | Check when `StockTickers.py` last run, and update if new quarter |
 
