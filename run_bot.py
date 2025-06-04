@@ -15,6 +15,7 @@ PORTFOLIO_FILE   = "portfolio_summary.json"
 TRADE_LOG        = "trades_log.json"
 DAILY_SCREEN     = "daily_screen.json"
 LAST_SELECT_RUN  = "selectstocks_last_run.txt"
+LAST_STOCKTICKERS_RUN = "stocktickers_last_run.txt"
 MONITOR_FLAG = "monitor_started.txt"
 DEFERRED_SELLS_FILE = "deferred_sells.json"
 INITIAL_CASH     = 10_000
@@ -23,13 +24,24 @@ INITIAL_CASH     = 10_000
 os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
 # ─── PRE-FETCH HISTORICAL DATA ─────────────────────────────────────────────────
-# Load universe same as SelectStocks
-ftse100 = pd.read_csv("ftse100_constituents.csv")
-UNIVERSE = [f"{s}.L" for s in ftse100["Symbol"].dropna().unique()]
+# Load tickers from ftse100_stocks.json
+with open("ftse100_stocks.json", "r", encoding="utf-8") as f:
+    ftse100 = json.load(f)
+
+UNIVERSE = list({
+    f"{stock['code'].rstrip('.').replace('.', '-')}.L"
+    for stock in ftse100
+    if stock.get("code")
+})
+
 # Cache 60 days daily history for all symbols
 fetch_and_cache_prices(UNIVERSE, period="60d", interval="1d", force=True, intraday=True) # Force = Ensure Latest values downloaded
 
 # ────────────────────────────────────────────────────────────────────────────────
+
+# The current quater
+def current_quarter(dt):
+    return (dt.month - 1) // 3 + 1  # 1-based: Jan-Mar = Q1, etc.
 
 # Log each time bot runs
 def log_run(run_data):
@@ -114,6 +126,25 @@ def job():
     init_portfolio()
 
     try:
+        # 0) ─── RUN STOCKTICKERS ON QUARTERLY REBALANCE DATES ─────────────────────
+        today = date.today()
+        this_q = current_quarter(today)
+        last_q = 0
+
+        if os.path.exists(LAST_STOCKTICKERS_RUN):
+            with open(LAST_STOCKTICKERS_RUN) as f:
+                last_run_date = datetime.strptime(f.read().strip(), "%Y-%m-%d").date()
+                last_q = current_quarter(last_run_date)
+
+        if this_q != last_q:
+            print("New quarter detected – running StockTickers.py")
+            run_script("StockTickers.py")
+            scripts_run.append("StockTickers")
+            with open(LAST_STOCKTICKERS_RUN, "w") as f:
+                f.write(str(today))
+        else:
+            print("StockTickers.py already ran this quarter – skipping")
+
         # 1) Daily screen once
         if not ran_select_today():
             run_script("SelectStocks.py")

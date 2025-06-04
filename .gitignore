@@ -13,3 +13,5 @@ monitor_deferred.log
 monitor_started.txt
 violations_log.json
 *.tmp
+ftse100_stocks.json
+stocktickers_last_run.txt
