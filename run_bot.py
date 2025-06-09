@@ -143,7 +143,7 @@ def job():
             with open(LAST_STOCKTICKERS_RUN, "w") as f:
                 f.write(str(today))
         else:
-            print("StockTickers.py already ran this quarter – skipping")
+            print("Skipping - StockTickers.py already ran this quarter")
 
         # 1) Daily screen once
         if not ran_select_today():
@@ -151,7 +151,7 @@ def job():
             scripts_run.append("SelectStocks")
             mark_select_ran()
         else:
-            print("Skipping SelectStocks.py (already ran today)")
+            print("Skipping - SelectStocks.py already ran today")
 
         # 2) How many sells have happened already today?
         sells_before = get_todays_sells()
