@@ -2,7 +2,7 @@
 import time
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, time
 #import yfinance as yf
 from DataManager import get_current_price, get_closes, get_intraday_prices 
 import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
@@ -21,6 +21,7 @@ MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
 ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
 TREND_SLOPE_THRESHOLD = 0.05  # Change to suit trends
+INTRADAY_VALID_FROM = time(8, 15)  # 08:15 AM
 
 # Load File - Check if currently being written to
 def load_json_with_retry(filepath, retries=5, delay=5):
@@ -101,6 +102,9 @@ if os.path.exists(DEFERRED_SELLS_FILE):
 else:
     deferred_sells = {}
 
+
+now = datetime.now().time()
+
 for tkr, info in sell_sigs.items():
     
     # Momentum Only Updated Daily
@@ -111,19 +115,22 @@ for tkr, info in sell_sigs.items():
     closes = get_closes(tkr)
     last_close_price = closes[-1] if closes else 0
 
-    # Optional: Load intraday price data
-    intraday_prices = get_intraday_prices(tkr)  # List of (datetime, price)
+    if now >= INTRADAY_VALID_FROM:
+        # Optional: Load intraday price data
+        intraday_prices = get_intraday_prices(tkr)  # List of (datetime, price)
 
-    if current_price > last_close_price * 1.01 and is_trending_up(intraday_prices): # Delay if >1% threshold increase and slope trending up
-        percent_change = ((current_price - last_close_price) / last_close_price) * 100
-        # Defer selling stocks still trending upward
-        deferred_sells[tkr] = {
-            "latest_price": current_price,
-            "momentum": momentum,
-            "date_flagged": str(date.today())
-        }
-        print(f"⏩ Deferred selling {tkr}: positive momentum ({momentum:.2f})")
-        continue
+        if current_price > last_close_price * 1.01 and is_trending_up(intraday_prices): # Delay if >1% threshold increase and slope trending up
+            percent_change = ((current_price - last_close_price) / last_close_price) * 100
+            # Defer selling stocks still trending upward
+            deferred_sells[tkr] = {
+                "latest_price": current_price,
+                "momentum": momentum,
+                "date_flagged": str(date.today())
+            }
+            print(f"⏩ Deferred selling {tkr}: positive momentum ({momentum:.2f})")
+            continue
+    else:
+        print(f"⏳ Skipping intraday logic for {tkr} (market just opened, before 08:15)")
 
     # Otherwise, sell normally
     if tkr in holdings:
