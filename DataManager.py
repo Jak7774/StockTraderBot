@@ -1,10 +1,11 @@
 import json
 import os
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, time
 import pandas as pd
 
 CACHE_FILE = "price_cache.json"
+INTRADAY_VALID_FROM = time(8, 30)  # 08:30 AM
 
 def fetch_and_cache_prices(tickers, period="60d", interval="1d", intraday=False, intraday_interval="5m", force=False): # force=True to force update to cahce
     """
@@ -62,7 +63,10 @@ def fetch_and_cache_prices(tickers, period="60d", interval="1d", intraday=False,
         }
 
         # Fetch intraday data if requested
-        if intraday:
+        now = datetime.now().time()
+        timeflag = False
+        if intraday & (now >= INTRADAY_VALID_FROM):
+            timeflag = True
             try:
                 df_intra = yf.download(
                     tickers=t,
@@ -86,6 +90,9 @@ def fetch_and_cache_prices(tickers, period="60d", interval="1d", intraday=False,
                     }
             except Exception as e:
                 print(f"[Warning] Could not fetch intraday for {t}: {e}")
+        
+    if timeflag == False:
+        print(f"⏳ Skipping - Intraday Logic (market opened recently)")
 
     # Write cache file
     with open(CACHE_FILE, 'w') as f:
