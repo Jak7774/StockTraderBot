@@ -21,7 +21,7 @@ MAX_ALLOC      = 0.30  # 30% cap per ticker
 MIN_ALLOC      = 0.01  # 1% floor per ticker
 ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
 TREND_SLOPE_THRESHOLD = 0.05  # Change to suit trends
-INTRADAY_VALID_FROM = time(8, 15)  # 08:15 AM
+INTRADAY_VALID_FROM = time(8, 30)  # 08:30 AM
 
 # Load File - Check if currently being written to
 def load_json_with_retry(filepath, retries=5, delay=5):
