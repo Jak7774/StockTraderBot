@@ -7,9 +7,15 @@ import json
 from datetime import datetime, timedelta, date
 
 # ─── 1) YOUR UNIVERSE ───────────────────────────────────────────────────────────
-ftse100 = pd.read_csv("ftse100_constituents.csv")  
-TICKERS = ftse100["Symbol"].dropna().unique().tolist()
-TICKERS = [f"{symbol}.L" for symbol in TICKERS] # Add .L for the UK version only stocks (some might throw errors)
+
+with open("ftse100_stocks.json", "r", encoding="utf-8") as f:
+    ftse100 = json.load(f)
+
+TICKERS = list({
+    f"{stock['code'].rstrip('.').replace('.', '-')}.L"
+    for stock in ftse100
+    if stock.get("code")
+})
 
 #sp500 = pd.read_csv("sp500_constituents.csv")  
 #TICKERS = sp500["Symbol"].dropna().unique().tolist()
