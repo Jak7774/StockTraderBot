@@ -2,6 +2,7 @@
 from DataManager import load_cached_prices, get_current_price
 import pandas as pd
 import json
+from datetime import datetime
 
 # ─── 1) LOAD CURRENT HOLDINGS ───────────────────────────────────────────────────
 try:
@@ -27,13 +28,26 @@ try:
 except (FileNotFoundError, ValueError):
     cost_basis_map = {}
 
-# ─── 2) LOAD TODAY'S SCREEN ────────────────────────────────────────────────────
+# ─── 2) LOAD TODAY'S SCREEN & SELLS ─────────────────────────────────────────────────
+
+# Track tickers sold today
+today = datetime.today().strftime("%Y-%m-%d")
+sells_today = {}
+
+try:
+    with open("trades_log.json") as f:
+        trades = json.load(f)
+        for trade in trades:
+            if trade["action"] == "SELL" and trade["date"] == today:
+                sells_today[trade["ticker"]] = trade["price"]
+except (FileNotFoundError, ValueError):
+    pass
+
 with open("daily_screen.json", "r") as f:
     screen = json.load(f)
-to_buy = screen.get("to_buy", [])
 
-# Instead of using to_sell from daily_screen, use all current holdings
-to_sell = list(holdings)
+to_buy = screen.get("to_buy", [])
+to_sell = list(holdings) # Use Current Holdings (not daily_screen)
 
 print(f"Candidates to BUY : {to_buy}")
 print(f"Candidates to SELL (from current holdings): {to_sell}\n")
@@ -109,8 +123,15 @@ def last_signal(ticker):
 # ─── 5) CHECK BUY CANDIDATES ────────────────────────────────────────────────────
 for t in to_buy:
     sig, price = last_signal(t)
+    if t in sells_today:
+        last_sold_price = sells_today[t]
+        if price >= last_sold_price * 0.95:  # not at least 5% cheaper
+            print(f"Skipping {t}: sold earlier today at {last_sold_price}, current {price:.2f} (not 5% lower)")
+            continue  # skip this ticker
+
     if sig == "BUY":
         buy_signals[t] = {"latest_price": round(price, 2), "signal": sig}
+
 
 # ─── 6) CHECK ALL CURRENT HOLDINGS FOR SELL SIGNALS ─────────────────────────────
 for t in holdings:
