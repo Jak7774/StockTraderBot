@@ -39,7 +39,7 @@ for ticker, sub in df.groupby("ticker"):
     total_sell_proceed = (sells["shares"] * sells["price"]).sum()
 
     net_shares = total_buy_shares - total_sell_shares
-    if net_shares > 0:
+    if round(net_shares, 5) > 0:
         # average cost basis, adjusted for proceeds of sells
         net_cost = total_buy_cost - total_sell_proceed
         cost_basis = net_cost / net_shares
@@ -49,11 +49,6 @@ for ticker, sub in df.groupby("ticker"):
         }
     else:
         continue  # Do not include stocks with no remaining shares
-
-    summary[ticker] = {
-        "shares":      round(net_shares, 3),
-        "cost_basis":  round(cost_basis, 2) if cost_basis is not None else None
-    }
 
 # Find last buy and sell timestamps
 df['date'] = pd.to_datetime(df['date'], format='ISO8601')
