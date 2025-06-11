@@ -130,7 +130,7 @@ for tkr, info in sell_sigs.items():
             print(f"⏩ Deferred selling {tkr}: positive momentum ({momentum:.2f})")
             continue
     else:
-        print(f"⏳ Skipping intraday logic for {tkr} (market just opened, before 08:15)")
+        print(f"⏳ Skipping - Intraday Logic ({tkr} (market just opened)")
 
     # Otherwise, sell normally
     if tkr in holdings:
