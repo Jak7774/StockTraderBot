@@ -116,19 +116,32 @@ for tkr, info in sell_sigs.items():
     last_close_price = closes[-1] if closes else 0
 
     if now >= INTRADAY_VALID_FROM:
-        # Optional: Load intraday price data
-        intraday_prices = get_intraday_prices(tkr)  # List of (datetime, price)
 
-        if current_price > last_close_price * 1.01 and is_trending_up(intraday_prices): # Delay if >1% threshold increase and slope trending up
-            percent_change = ((current_price - last_close_price) / last_close_price) * 100
-            # Defer selling stocks still trending upward
-            deferred_sells[tkr] = {
-                "latest_price": current_price,
-                "momentum": momentum,
-                "date_flagged": str(date.today())
-            }
-            print(f"⏩ Deferred selling {tkr}: positive momentum ({momentum:.2f})")
+        # Optional: Load intraday price data
+        try:
+            intraday_prices = get_intraday_prices(tkr)  # List of (datetime, price)
+        except Exception as e:
+            print(f"Skipping {tkr}: failed to load intraday prices ({e})")
             continue
+
+        # Skip if intraday_prices is missing or invalid
+        if not intraday_prices or not all(len(p) == 2 for p in intraday_prices):
+            print(f"Skipping {tkr}: intraday data is missing or invalid")
+            continue
+
+        try:
+            if current_price > last_close_price * 1.01 and is_trending_up(intraday_prices): # Delay if >1% threshold increase and slope trending up
+                percent_change = ((current_price - last_close_price) / last_close_price) * 100
+                # Defer selling stocks still trending upward
+                deferred_sells[tkr] = {
+                    "latest_price": current_price,
+                    "momentum": momentum,
+                    "date_flagged": str(date.today())
+                }
+                print(f"⏩ Deferred selling {tkr}: positive momentum ({momentum:.2f})")
+                continue
+        except Exception as e:
+            print(f"Error processing {tkr}: {e}")
     else:
         print(f"⏳ Skipping - Intraday Logic ({tkr} (market just opened)")
 
