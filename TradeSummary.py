@@ -158,28 +158,28 @@ for tkr, info in output["holdings"].items():
 print(f"\n✅ Saved trade summary to {OUTPUT_FILE}")
 
 # ─── 10) PLOT PROFIT/LOSS SUMMARY ──────────────────────────────────────────────────
-# Extract the history section
-history = portfolio['history']
-df = pd.DataFrame(history)
-df['datetime'] = pd.to_datetime(df['datetime'])
-df.set_index('datetime', inplace=True)
+# # Extract the history section
+# history = portfolio['history']
+# df = pd.DataFrame(history)
+# df['datetime'] = pd.to_datetime(df['datetime'])
+# df.set_index('datetime', inplace=True)
 
-# Calculate daily average total value and forward-fill missing days
-daily_avg = df['total_value'].resample('D').mean().ffill()
+# # Calculate daily average total value and forward-fill missing days
+# daily_avg = df['total_value'].resample('D').mean().ffill()
 
-# Plot total value over time
-plt.figure(figsize=(12, 6))
-# Scatter plot of all portfolio values
-plt.scatter(df.index, df['total_value'], color='blue', alpha=0.5, label='Hourly Portfolio Value')
-# Line plot of daily average
-plt.plot(daily_avg.index, daily_avg, color='red', linewidth=2, label='Daily Average Value')
-plt.title('Portfolio Total Value Over Time')
-plt.xlabel('Date')
-plt.ylabel('Total Value (£)')
-plt.grid(True)
-plt.tight_layout()
+# # Plot total value over time
+# plt.figure(figsize=(12, 6))
+# # Scatter plot of all portfolio values
+# plt.scatter(df.index, df['total_value'], color='blue', alpha=0.5, label='Hourly Portfolio Value')
+# # Line plot of daily average
+# plt.plot(daily_avg.index, daily_avg, color='red', linewidth=2, label='Daily Average Value')
+# plt.title('Portfolio Total Value Over Time')
+# plt.xlabel('Date')
+# plt.ylabel('Total Value (£)')
+# plt.grid(True)
+# plt.tight_layout()
 
-# Show plot non-blocking, wait 10 seconds, then close
-plt.show(block=False)
-plt.pause(10)
-plt.close()
+# # Show plot non-blocking, wait 10 seconds, then close
+# plt.show(block=False)
+# plt.pause(10)
+# plt.close()
