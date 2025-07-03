@@ -24,6 +24,11 @@ INITIAL_CASH     = 10_000
 os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
 # ─── PRE-FETCH HISTORICAL DATA ─────────────────────────────────────────────────
+# Ensure ftse100_stocks.json exists
+if not os.path.exists("ftse100_stocks.json"):
+    print("ftse100_stocks.json not found – running StockTickers.py")
+    subprocess.run(["python", "StockTickers.py"], check=True)
+    
 # Load tickers from ftse100_stocks.json
 with open("ftse100_stocks.json", "r", encoding="utf-8") as f:
     ftse100 = json.load(f)
