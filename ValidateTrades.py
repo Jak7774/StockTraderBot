@@ -30,7 +30,7 @@ for trade in trades:
     ticker = trade['ticker']
     quantity = trade['shares']
     price = trade['price']
-    total_cost = quantity * price
+    total_cost = round(quantity * price, 2) 
 
     if action == 'BUY':
         if cash >= total_cost:
