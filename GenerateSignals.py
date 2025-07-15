@@ -2,7 +2,7 @@
 from DataManager import load_cached_prices, get_current_price
 import pandas as pd
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ─── 1) LOAD CURRENT HOLDINGS ───────────────────────────────────────────────────
 try:
@@ -31,15 +31,25 @@ except (FileNotFoundError, ValueError):
 # ─── 2) LOAD TODAY'S SCREEN & SELLS ─────────────────────────────────────────────────
 
 # Track tickers sold today
-today = datetime.today().strftime("%Y-%m-%d")
-sells_today = {}
+from datetime import datetime, timedelta
+
+# Track buys and sells
+today = datetime.today().date()
+buys_today = {}
+recent_sells = {}
 
 try:
     with open("trades_log.json") as f:
         trades = json.load(f)
         for trade in trades:
-            if trade["action"] == "SELL" and trade["date"] == today:
-                sells_today[trade["ticker"]] = trade["price"]
+            trade_date = datetime.fromisoformat(trade["date"]).date()
+            ticker = trade["ticker"]
+            if trade["action"] == "BUY" and trade_date == today:
+                buys_today[ticker] = trade["price"]
+            elif trade["action"] == "SELL" and (today - trade_date).days <= 3:
+                if ticker not in recent_sells:
+                    recent_sells[ticker] = []
+                recent_sells[ticker].append(trade["price"])
 except (FileNotFoundError, ValueError):
     pass
 
@@ -123,11 +133,31 @@ def last_signal(ticker):
 # ─── 5) CHECK BUY CANDIDATES ────────────────────────────────────────────────────
 for t in to_buy:
     sig, price = last_signal(t)
-    if t in sells_today:
-        last_sold_price = sells_today[t]
-        if price >= last_sold_price * 0.95:  # not at least 5% cheaper
-            print(f"Skipping {t}: sold earlier today at {last_sold_price}, current {price:.2f} (not 5% lower)")
-            continue  # skip this ticker
+
+    if price is None:
+        continue
+
+    # Rule 1: Positive momentum > 2%
+    momentum_pct = screen["momentum"].get(t, 0)
+    if momentum_pct <= 2:
+        print(f"Skipping {t}: momentum {momentum_pct:.2f}% not > 2%")
+        continue
+
+    # Rule 2: Price jump can't be more than 10% from today's open
+    closes = price_cache.get(t, {}).get("close", [])
+    if len(closes) < 2:
+        print(f"Skipping {t}: not enough price history")
+        continue
+    todays_open = closes[-1]  # assume today's open = today's close (no real open price)
+    if price > todays_open * 1.10: # if > 10% then missed price increase so don't bother buy (too late)
+        print(f"Skipping {t}: current price {price:.2f} is more than 10% above today's open {todays_open:.2f}")
+        continue
+
+    # Rule 3: At least 5% lower than recent sell price (last 3 days)
+    if t in recent_sells:
+        if all(price >= s * 0.95 for s in recent_sells[t]):
+            print(f"Skipping {t}: not at least 5% cheaper than recent sells")
+            continue
 
     if sig == "BUY":
         buy_signals[t] = {"latest_price": round(price, 2), "signal": sig}
@@ -135,10 +165,13 @@ for t in to_buy:
 
 # ─── 6) CHECK ALL CURRENT HOLDINGS FOR SELL SIGNALS ─────────────────────────────
 for t in holdings:
+    if t in buys_today:
+        print(f"Skipping {t}: bought today → 1-day cooldown in effect")
+        continue
+
     sig, price = last_signal(t)
     if sig == "SELL":
         sell_signals[t] = {"latest_price": round(price, 2), "signal": sig}
-
 
 # ─── 7) SAVE TRADE SIGNALS ─────────────────────────────────────────────────────
 out = {
