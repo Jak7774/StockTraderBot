@@ -5,10 +5,8 @@ from matplotlib.dates import num2date
 import matplotlib.dates as mdates
 from collections import defaultdict, deque
 from datetime import datetime
+from GenerateSignals import df_from_cache, SHORT_W, LONG_W, calculate_macd  # <-- import shared logic
 
-# MA window sizes
-SHORT_W = 5
-LONG_W = 20
 BUFFER = LONG_W
 
 # Load data
@@ -48,40 +46,61 @@ if mode == "1":
     ticker = owned_tickers[choice]
     start_date = buy_dates[ticker]
 
-    # Extract price data
-    daily_data = price_data[ticker]["daily"]
-    dates = pd.to_datetime(daily_data["dates"])
-    close_prices = daily_data["close"]
-    df = pd.DataFrame({"Close": close_prices}, index=dates)
-    df.index.name = "Date"
-    df.sort_index(inplace=True)
+    df = df_from_cache(ticker)
+    if df.empty:
+        print("No price data available.")
+        exit()
 
-    # Calculate buffered start date
-    BUFFER_DAYS = 2 * LONG_W  # use same buffer as mode 2 for consistency
+    BUFFER_DAYS = 4 * LONG_W
     raw_buffered_start = start_date - pd.Timedelta(days=BUFFER_DAYS)
-
-    # Find actual buffered start date in data
     available_start = df.index[df.index.get_indexer([raw_buffered_start], method="bfill")[0]]
     df_ma = df[df.index >= available_start].copy()
 
-    # Calculate moving averages on full buffered data
-    df_ma["Short_MA"] = df_ma["Close"].rolling(SHORT_W).mean()
-    df_ma["Long_MA"] = df_ma["Close"].rolling(LONG_W).mean()
 
-    # Slice for plotting from actual buy date forward
-    df_plot = df_ma[df_ma.index >= start_date]
+    df_ma = calculate_macd(df_ma)
+    df_ma["Short_EMA"] = df_ma["Close"].ewm(span=SHORT_W, adjust=False).mean()
+    df_ma["Long_EMA"] = df_ma["Close"].ewm(span=LONG_W, adjust=False).mean()
 
-    # Plotting
-    plt.figure(figsize=(12, 6))
-    plt.plot(df_plot["Close"], label="Stock Price (£)", color="gray", alpha=0.6)
-    plt.plot(df_plot["Short_MA"], label=f"Short MA ({SHORT_W}-day)", color="blue")
-    plt.plot(df_plot["Long_MA"], label=f"Long MA ({LONG_W}-day)", color="red")
-    plt.axvline(start_date, color='green', linestyle='--', alpha=0.5, label="Buy Date")
-    plt.title(f"{ticker} Price & MA Crossover (since {start_date.date()})")
+    start_plot_date = df_ma.index[df_ma.index.get_indexer([start_date], method='ffill')[0]]
+    df_plot = df_ma[df_ma.index >= start_plot_date]
+
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    # Plot price and EMAs on primary y-axis
+    ax1.plot(df_plot["Close"], label="Stock Price (£)", color="gray", alpha=0.6)
+    ax1.plot(df_plot["Short_EMA"], label=f"Short EMA ({SHORT_W}-day)", color="blue")
+    ax1.plot(df_plot["Long_EMA"], label=f"Long EMA ({LONG_W}-day)", color="red")
+    ax1.set_ylabel("Price (£)")
+    ax1.grid(True)
+
+    ax1.axvline(start_date, color='green', linestyle='--', alpha=0.5, label="Buy Date")
+
+    # Create secondary y-axis for MACD
+    ax2 = ax1.twinx()
+    ax2.plot(df_plot["MACD"], label="MACD Line", color="purple", linestyle="--")
+    ax2.plot(df_plot["Signal"], label="Signal Line (MACD)", color="orange", linestyle=":")
+    ax2.set_ylabel("MACD")
+    ax2.axhline(0, color="black", linestyle="--", linewidth=0.5)
+
+    # Combine legends from both axes
+    lines_1, labels_1 = ax1.get_legend_handles_labels()
+    lines_2, labels_2 = ax2.get_legend_handles_labels()
+    ax1.legend(
+        lines_1 + lines_2,
+        labels_1 + labels_2,
+        loc='upper left',
+        bbox_to_anchor=(1.05, 1),
+        borderaxespad=0.,
+        fontsize='small'
+    )
+
+    plt.title(f"{ticker} Price, EMA & MACD (since {start_date.date()})")
     plt.xlabel("Date")
-    plt.ylabel("Price (£)")
-    plt.grid(True)
-    plt.legend()
+
+    left_padding = pd.Timedelta(days=0.5)
+    right_padding = pd.Timedelta(days=1)
+    plt.xlim(start_date - left_padding, df_plot.index[-1] + right_padding)
+
     plt.tight_layout()
     plt.show()
 
