@@ -6,6 +6,7 @@ import pandas as pd
 #import yfinance as yf
 from DataManager import load_cached_prices, get_current_price
 import matplotlib.pyplot as plt
+import time
 
 LOG_FILE        = "trades_log.json"
 PORTFOLIO_FILE  = "portfolio_summary.json"
@@ -156,6 +157,7 @@ for tkr, info in output["holdings"].items():
       f"current ${current} → ${info['market_value']}{reset}")
 
 print(f"\n✅ Saved trade summary to {OUTPUT_FILE}")
+time.sleep(10) # Display for 10 seconds before ending
 
 # ─── 10) PLOT PROFIT/LOSS SUMMARY ──────────────────────────────────────────────────
 # # Extract the history section
