@@ -21,6 +21,25 @@ with open(PORTFOLIO_FILE) as f:
 cash_remaining = portfolio.get("cash", 0)
 initial_cash = 10_000
 
+if not trades:
+    print("⚠️  No trades found. Skipping summary generation.")
+    output = {
+        "date": str(date.today()),
+        "total_trades": 0,
+        "buys": 0,
+        "sells": 0,
+        "cash_remaining": cash_remaining,
+        "market_value": 0,
+        "total_value": cash_remaining,
+        "total_change": 0,
+        "change_since_last": 0,
+        "holdings": {}
+    }
+    with open(OUTPUT_FILE, "w") as f:
+        json.dump(output, f, indent=2)
+    print(f"✅ Saved empty trade summary to {OUTPUT_FILE}")
+    exit()
+
 # ─── 2) BUILD TRADES DATAFRAME ──────────────────────────────────────────────────
 df = pd.DataFrame(trades)
 total_trades = len(df)
