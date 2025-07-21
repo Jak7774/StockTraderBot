@@ -15,3 +15,4 @@ violations_log.json
 *.tmp
 ftse100_stocks.json
 stocktickers_last_run.txt
+__pycache__/GenerateSignals.cpython-312.pyc
