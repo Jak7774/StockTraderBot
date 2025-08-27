@@ -91,7 +91,7 @@ def last_signal(ticker, cost_basis_map=None):
     df = df_from_cache(ticker)
     if df.empty or len(df) < REQUIRED_LOOKBACK:
         print(f"{ticker}: Insufficient data ({len(df)} rows)")
-        return None, None
+        return None, None, None, None
 
     # ----  EMA Signals
     df['Short_EMA'] = df['Close'].ewm(span=SHORT_W, adjust=False).mean()
@@ -127,27 +127,64 @@ def last_signal(ticker, cost_basis_map=None):
     cb = cost_basis_map.get(ticker)
 
     # ─── SELL LOGIC ─────────────────────────────────────
+    # Dynamnic Stop Percentages
+    df['TR'] = pd.concat([
+        df['High'] - df['Low'],
+        (df['High'] - df['Close'].shift()).abs(),
+        (df['Low'] - df['Close'].shift()).abs()
+    ], axis=1).max(axis=1)
+    # Dynamic Period based on last 5 days - if not volatile use base (14 days) - else adjust
+    recent_volatility = df['TR'].rolling(window=5).std().iloc[-1]
+    base_window = 14
+    adj_window = max(10, min(30, int(base_window * (1 + recent_volatility / df['TR'].mean()))))
+    df['ATR'] = df['TR'].rolling(window=adj_window).mean()
+
+    atr = df['ATR'].iloc[-1]
+    if atr is None or pd.isna(atr):
+        atr = 0  # fallback
+
     if cb is not None:
         peak = df['Close'].max()
-        if current_price <= peak * (1 - TRAIL_STOP_PCT):
-            return 'SELL', current_price
-        if current_price <= cb * (1 - STOP_LOSS_PCT):
-            return 'SELL', current_price
+
+        # Dynamic Trailing Stop
+        if peak - current_price >= 2 * atr:
+            return 'SELL', current_price, market_type, "trailing_stop"
+        #if current_price <= peak * (1 - TRAIL_STOP_PCT):
+        #    return 'SELL', current_price, market_type
+        
+        # Dynamic Stop Loss
+        if cb - current_price >= 3 * atr:
+            return 'SELL', current_price, market_type, "stop_loss"
+        #if current_price <= cb * (1 - STOP_LOSS_PCT):
+        #    return 'SELL', current_price, market_type
+        
         if current_price >= cb * (1 + TAKE_PROFIT_PCT):
-            return 'SELL', current_price
+            return 'SELL', current_price, market_type, "take_profit"
 
     # ─── STRATEGY SWITCHING ──────────────────────────────────
 
     if market_type == "TRENDING": # Continual Trend Up - Reliable MACD/EMA signals
         # Trend-Based Sell
         if df['Position'].iloc[-1] == -1 and macd_cross_down:
-            return 'SELL', current_price
+            return 'SELL', current_price, market_type, "ema_macd_crossover"
         # Trend-Based Buy
         recent = df[df['Position'].isin([1, -1])]
         if not recent.empty:
             last = recent.iloc[-1]
             if last['Position'] == 1 and macd_cross_up:
-                return 'BUY', current_price
+                # Check RSI not overbrought 
+                if df['RSI'].iloc[-1] > 65:
+                    #print(f"{ticker}: Skipping TRENDING BUY — RSI too high")
+                    return None, current_price, market_type, "rsi_overbrought"
+                # Price not >5% than short EMA - as likely indicates a peak
+                if current_price > df['Short_EMA'].iloc[-1] * 1.05:
+                    #print(f"{ticker}: Skipping TRENDING BUY — price extended above EMA")
+                    return None, current_price, market_type, "extended_over_ema"
+                # Skip if price is >5% above yesterday’s close
+                if df['Close'].iloc[-1] > df['Close'].iloc[-2] * 1.05:
+                    #print(f"{ticker}: Skipping — large daily gain, wait for pullback")
+                    return None, current_price, market_type, "extended_over_close"
+                return 'BUY', current_price, market_type, "trend_buy"
             
     elif market_type == "SIDEWAYS": # Market Bouncing Around - Need RSI/Bollinger bands to buy low sell high
         last_rsi = df['RSI'].iloc[-1]
@@ -157,16 +194,16 @@ def last_signal(ticker, cost_basis_map=None):
 
         # Sideways Buy: Oversold + below lower band
         if last_rsi < 30 and last_close < lower_band:
-            return 'BUY', current_price
+            return 'BUY', current_price, market_type, "rsi_below_band"
 
         # Sideways Sell: Overbought + above upper band
         if last_rsi > 70 and last_close > upper_band:
-            return 'SELL', current_price
+            return 'SELL', current_price, market_type, "rsi_above_band"
 
     # Print Out Positions to see which are close    
     #print(f"{ticker}: Position={last['Position']} | MACD hist: {last_macd:.4f} → {curr_macd:.4f}")
         
-    return None, current_price
+    return None, current_price, market_type, None
 
 
 def main():
@@ -188,9 +225,15 @@ def main():
         holdings = set()
 
     # ─── 2) LOAD TRADES  ────────────────────────────────────
+    market_type_count = {
+        "BUY": {"TRENDING": 0, "SIDEWAYS": 0},
+        "SELL": {"TRENDING": 0, "SIDEWAYS": 0}
+    }
+
     today = datetime.today().date()
     buys_today = {}
     recent_sells = {}
+    recent_losses = {}
 
     try:
         with open("trades_log.json") as f:
@@ -200,10 +243,25 @@ def main():
                 ticker = trade["ticker"]
                 if trade["action"] == "BUY" and trade_date == today:
                     buys_today[ticker] = trade["price"]
-                elif trade["action"] == "SELL" and (today - trade_date).days <= 3:
-                    if ticker not in recent_sells:
-                        recent_sells[ticker] = []
-                    recent_sells[ticker].append(trade["price"])
+                elif trade["action"] == "SELL":
+                    # Track recent sells for price comparison
+                    if (today - trade_date).days <= 3:
+                        if ticker not in recent_sells:
+                            recent_sells[ticker] = []
+                        recent_sells[ticker].append(trade["price"])
+
+                    # Identify if the SELL was at a loss 
+                    all_buys = [
+                        t for t in trades 
+                        if t["ticker"] == ticker and t["action"] == "BUY" 
+                        and datetime.fromisoformat(t["date"]).date() <= trade_date
+                    ]
+                    if all_buys:
+                        last_buy = max(all_buys, key=lambda t: datetime.fromisoformat(t["date"]))
+                        pnl = trade["price"] - last_buy["price"]
+                        if pnl < 0:
+                            # Save the loss date for cool-off logic
+                            recent_losses[ticker] = trade_date
     except (FileNotFoundError, ValueError):
         pass
 
@@ -220,12 +278,24 @@ def main():
 
     # ─── 5) CHECK BUY CANDIDATES ────────────────────────────────────────────────────
     for t in to_buy:
-        sig, price = last_signal(t)
+        sig, price, market_type, trigger = last_signal(t)
+        if market_type:
+            market_type_count["BUY"][market_type] += 1
+
         if sig == "BUY":
             if price is None:
                 continue
 
-            # Rule 1: Price jump can't be more than 10% from today's open
+            # Rule 1: Dynamic cool-off period if recent loss
+            if t in recent_losses:
+                days_since_loss = (today - recent_losses[t]).days
+                if days_since_loss < 5:  # You can customise this number
+                    print(f"Skipping {t}: recent loss ({days_since_loss}d ago) → extended cool-off in effect")
+                    continue
+                else:
+                    print(f"{t}: recent loss detected ({days_since_loss}d ago) → cool-off satisfied")
+
+            # Rule 2: Price jump can't be more than 10% from today's open
             closes = price_cache.get(t, {}).get("close", [])
             if len(closes) < 2:
                 print(f"Skipping {t}: not enough price history")
@@ -235,19 +305,21 @@ def main():
                 print(f"Skipping {t}: current price {price:.2f} is more than 10% above today's open {todays_open:.2f}")
                 continue
 
-            # Rule 2: At least 5% lower than recent sell price (last 3 days)
+            # Rule 3: At least 5% lower than recent sell price (last 3 days)
             if t in recent_sells:
                 if all(price >= s * 0.95 for s in recent_sells[t]):
                     print(f"Skipping {t}: not at least 5% cheaper than recent sells")
                     continue
 
-            buy_signals[t] = {"latest_price": round(price, 2), "signal": sig}
+            buy_signals[t] = {"latest_price": round(price, 2), "signal": sig, "trigger": trigger}
 
 
     # ─── 6) CHECK ALL CURRENT HOLDINGS FOR SELL SIGNALS ─────────────────────────────
     if holdings:
         for t in holdings:
-            sig, price = last_signal(t)
+            sig, price, market_type, trigger = last_signal(t)
+            if market_type:
+                market_type_count["SELL"][market_type] += 1
 
             if t in buys_today:
                 # Allow override if the sell is urgent (trailing stop / stop loss / take profit)
@@ -258,7 +330,7 @@ def main():
                     print(f"Skipping {t}: bought today → 1-day cooldown in effect")
                     continue
             elif sig == "SELL":
-                sell_signals[t] = {"latest_price": round(price, 2), "signal": sig}
+                sell_signals[t] = {"latest_price": round(price, 2), "signal": sig, "trigger": trigger}
     else:
         print("⚠️ No holdings found — skipping SELL signal logic.")
 
@@ -267,6 +339,12 @@ def main():
         "buy_signals":  buy_signals,
         "sell_signals": sell_signals
     }
+
+    print("\n📊 Market Type Summary:")
+    for category in ["BUY", "SELL"]:
+        print(f"  {category}:")
+        for mtype in ["TRENDING", "SIDEWAYS"]:
+            print(f"    {mtype}: {market_type_count[category][mtype]} stocks")
 
     with open("trade_signals.json", "w") as f:
         json.dump(out, f, indent=4)
