@@ -15,6 +15,7 @@ import numpy as np
 RUN_LOG_FILE = "run_log.json"
 PORTFOLIO_FILE = "portfolio_summary.json"
 TRADE_LOG_FILE = "trades_log.json"
+TRADE_SIGNALS_FILE = "trade_signals.json"
 DEFERRED_FILE = "deferred_sells.json"
 
 # === Sell Strategy Thresholds ===
@@ -107,12 +108,18 @@ def load_trade_log():
 def save_trade_log(trade_log):
     atomic_write_json(trade_log, TRADE_LOG_FILE)
 
+def load_trade_signals():
+    if not os.path.exists(TRADE_SIGNALS_FILE):
+        return {"buy_signals": {}, "sell_signals": {}}
+    return load_json_with_retry(TRADE_SIGNALS_FILE)
+
 # ───────── Main Function ───────────────────────────────────────────────────────────────────
 
 def monitor_deferred():
     portfolio = load_portfolio()
     deferred = load_deferred()
     trade_log = load_trade_log()
+    trade_signals = load_trade_signals()
 
     seen_tickers = set(deferred.keys())
     
@@ -166,7 +173,7 @@ def monitor_deferred():
             min_drop_factor = 1 - (MIN_DROP_BELOW_PEAK_PCT / 100)
             
             if (downtrend and current_price < peak_price * min_drop_factor) or large_drop or time_close:
-                sell(ticker, portfolio, trade_log, current_price)
+                sell(ticker, portfolio, trade_log, current_price, trade_signals)
                 deferred.pop(ticker)
 
                 if not deferred:
@@ -203,13 +210,18 @@ def monitor_deferred():
                 print(f"New deferred tickers detected: {', '.join(sorted(new_tickers))}")
                 print_status_line()  # ensure the status line is reprinted at bottom
 
-def sell(ticker, portfolio, trade_log, price):
+def sell(ticker, portfolio, trade_log, price, trade_signals):
     shares = portfolio["holdings"].pop(ticker, 0)
     if shares > 0:
         portfolio["cash"] += shares * price
+
+        raw_trigger = trade_signals.get("sell_signals", {}).get(ticker, {}).get("trigger", "unspecified")
+        trigger = f"deferred_{raw_trigger}"
+
         trade_log.append({
             "ticker": ticker,
             "action": "SELL",
+            "trigger": trigger,
             "date": datetime.datetime.now().isoformat(),
             "price": price,
             "shares": shares
