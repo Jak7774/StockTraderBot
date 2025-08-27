@@ -110,6 +110,9 @@ for tkr, info in sell_sigs.items():
     # Momentum Only Updated Daily
     momentum = momentum_map.get(tkr, 0)
 
+    # Reason for Sell
+    trigger = info.get("trigger", "unspecified")  
+
     # Get today's current and last close price
     current_price = get_current_price(tkr)
     closes = get_closes(tkr)
@@ -153,6 +156,7 @@ for tkr, info in sell_sigs.items():
         trade_log.append({
             "ticker": tkr,
             "action": "SELL",
+            "trigger": trigger,
             "date":   datetime.now().isoformat(),
             "price":  price,
             "shares": shares
@@ -239,6 +243,7 @@ if buy_list:
 
         for t, w in final_w.items():
             info = buy_sigs[t]
+            trigger = info.get("trigger", "unspecified") # Reason for Buy
             alloc = w * start_cash
             price = info["latest_price"]
 
@@ -256,6 +261,7 @@ if buy_list:
             trade_log.append({
                 "ticker": t,
                 "action": "BUY",
+                "trigger": trigger,
                 "date": datetime.now().isoformat(),
                 "price": price,
                 "shares": shares
@@ -282,6 +288,7 @@ if buy_list:
             trade_log.append({
                 "ticker":pick,
                 "action":"BUY",
+                "trigger": "opportunistic",
                 "date": datetime.now().isoformat(),
                 "price":price,
                 "shares":shares
