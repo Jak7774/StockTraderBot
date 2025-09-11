@@ -12,8 +12,8 @@ LONG_W  = 20
 REQUIRED_LOOKBACK = max(LONG_W, 35) # MACD Logic needs at least 26 days + 9 days = 35
 
 # Parameters to Sell if Rapid changes (not detected by Moving Averages)
-TRAIL_STOP_PCT = 0.05  # sell if price falls 5% from peak
-STOP_LOSS_PCT   = 0.10   # e.g. 10% drop
+TRAIL_STOP_PCT = 0.02  # sell if price falls 5% from peak
+STOP_LOSS_PCT   = 0.20   # e.g. 10% drop
 TAKE_PROFIT_PCT= 0.15   # e.g. 15% gain
 
 price_cache = load_cached_prices(data_type="daily")
