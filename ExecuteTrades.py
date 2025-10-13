@@ -4,10 +4,11 @@ import json
 import os
 from datetime import date, datetime, time
 #import yfinance as yf
-from DataManager import get_current_price, get_closes, get_intraday_prices 
+from DataManager import get_current_price, get_closes, get_intraday_prices, load_cached_prices
 import tempfile # Writing JSON files (avoid issues when run multiple instances of script)
 from sklearn.linear_model import LinearRegression
 import numpy as np
+import pandas as pd
 
 # ─── 1) SETTINGS ────────────────────────────────────────────────────────────────
 PORTFOLIO_FILE = "portfolio_summary.json"
@@ -22,6 +23,11 @@ MIN_ALLOC      = 0.01  # 1% floor per ticker
 ALLOW_FRACTIONAL = True  # Toggle for fractional share buying
 TREND_SLOPE_THRESHOLD = 0.05  # Change to suit trends
 INTRADAY_VALID_FROM = time(8, 30)  # 08:30 AM
+
+# ATR-based sizing params
+RISK_PCT = 0.01 # risk 1% of portfolio per trade
+ATR_MULT = 3 # stop distance = ATR_MULT * ATR
+MIN_FRACTION = 0.001 # minimum fractional share unit
 
 # Load File - Check if currently being written to
 def load_json_with_retry(filepath, retries=5, delay=5):
@@ -66,6 +72,11 @@ momentum_map = screen.get("momentum", {})
 # ─── 3B) CREATE PRICE CACHE ─────────────────────────────────────────────────────
 tickers_needed = set(buy_sigs) | set(sell_sigs) | set(holdings)
 price_cache = {t: get_current_price(t) for t in tickers_needed}
+try:
+    cached_ohlc = load_cached_prices(data_type="daily") or {}
+except Exception as e:
+    print(f"⚠️ Could not load cached OHLC: {e}")
+    cached_ohlc = {}
 
 # ─── 4) LOAD OR INIT TRADE LOG ──────────────────────────────────────────────────
 if os.path.exists(TRADES_LOG):
@@ -211,10 +222,58 @@ summary = {
     "no_signals": False,
 }
 
+# Helper: compute ATR using cached OHLC; fallback to closes if needed
+
+
+def compute_atr(ticker, period=14):
+    try:
+        data = cached_ohlc.get(ticker)
+        if data and all(k in data for k in ("high","low","close")):
+            highs = pd.Series(data['high'])
+            lows = pd.Series(data['low'])
+            closes = pd.Series(data['close'])
+            tr1 = highs - lows
+            tr2 = (highs - closes.shift()).abs()
+            tr3 = (lows - closes.shift()).abs()
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr = tr.rolling(window=period).mean().iloc[-1]
+            if pd.isna(atr):
+                return None
+            return float(atr)
+        
+        # Fallback: use close-series absolute returns as crude proxy
+        closes = get_closes(ticker)
+        if not closes or len(closes) < period+1:
+            return None
+        closes_s = pd.Series(closes)
+        tr_approx = closes_s.diff().abs()
+        atr_approx = tr_approx.rolling(window=period).mean().iloc[-1]
+        if pd.isna(atr_approx):
+            return None
+        return float(atr_approx)
+    
+    except Exception as e:
+        print(f"⚠️ ATR calc failed for {ticker}: {e}")
+        return None
+
+
+def portfolio_value(cash_local, holdings_local, price_map_local):
+    # price_map_local is expected to contain current prices for tickers
+    val = cash_local
+    for tk, sh in holdings_local.items():
+        p = price_map_local.get(tk)
+        if p is None:
+            try:
+                p = get_current_price(tk)
+            except Exception:
+                p = 0
+        val += p * sh
+    return val
+
 if buy_list:
     m_vals = {t: momentum_map[t] for t in buy_list}
     total_m = sum(m_vals.values())
-    raw_w = {t: m_vals[t] / total_m for t in buy_list}
+    raw_w = {t: m_vals[t] / total_m for t in buy_list} # Weights - How much stock to buy
 
     # Cap weights at MAX_ALLOC
     capped, overflow = {}, 0.0
@@ -244,19 +303,48 @@ if buy_list:
         for t, w in final_w.items():
             info = buy_sigs[t]
             trigger = info.get("trigger", "unspecified") # Reason for Buy
-            alloc = w * start_cash
+            #alloc = w * start_cash
             price = info["latest_price"]
 
+            # Risk-based allocation
+            total_val = cash + sum(get_current_price(x)*s for x,s in holdings.items())
+            risk_capital = RISK_PCT * total_val
+            
+            atr = compute_atr(t)
+            if atr is None or atr <= 0:
+                # fallback to a % of price if ATR is missing (3% of price stop)
+                fallback_atr = max(price * 0.01, 0.01)
+                atr = fallback_atr
+
+            stop_distance = max(ATR_MULT * atr, price * 0.005) # ensure stop distance not ridiculously small
+
+            # Shares limits
+            desired_value = w * start_cash
+            desired_shares = desired_value / price if price > 0 else 0
+            max_shares_by_risk = risk_capital / stop_distance if stop_distance > 0 else desired_shares
+            max_shares_by_alloc = (MAX_ALLOC * total_val) / price if price > 0 else 0
+
+            raw_shares = min(desired_shares, max_shares_by_risk, max_shares_by_alloc)
+
             if ALLOW_FRACTIONAL:
-                shares = round(alloc/price,6)
-                shares = round(shares,3) if shares>=0.001 else 0
+                shares = round(raw_shares, 3) if raw_shares >= MIN_FRACTION else 0
             else:
-                shares = int(alloc//price)
-            if shares<=0 or shares*price>cash:
-                summary['skipped'].append((t,alloc,price))
+                shares = int(raw_shares)
+
+            # Ensure affordable
+            if ALLOW_FRACTIONAL:
+                max_affordable = round(cash / price, 3) if price > 0 else 0
+                shares = min(shares, max_affordable)
+            else:
+                shares = min(shares, int(cash // price) if price > 0 else 0)
+
+            if shares <= 0:
+                summary['skipped'].append((t, desired_value, price))
+                #print(f"Skipping {t}: alloc {desired_value:.2f}, price {price:.2f}, shares calc {raw_shares:.4f}")
                 continue
 
-            cash -= shares*price
+            cost = shares * price
+            cash -= cost
             holdings[t] = round(holdings.get(t, 0) + shares, 3)
             trade_log.append({
                 "ticker": t,
@@ -269,32 +357,72 @@ if buy_list:
             print(f"Bought {shares} of {t} @ ${price:.2f}")
             summary["bought"].append((t, shares, price))
 
-        # Opportunistic buys
-        price_map = {t:price_cache[t] for t in set(holdings)|set(buy_list)}
-
+        # ----------- Opportunistic buys ---------------- #
+        # Build a fresh price map for candidates
+        price_map = {t: price_cache.get(t, get_current_price(t)) for t in set(holdings) | set(buy_list)}
+        
         while True:
             total_val = cash + sum(get_current_price(t)*s for t,s in holdings.items())
             viable = {t:p for t,p in price_map.items() if p>0 and cash>=(0.01 if ALLOW_FRACTIONAL else p)}
             if not viable: break
-            pick,price = min(viable.items(),key=lambda kv:kv[1])
+
+            # pick the cheapest available (as original logic)
+            pick, price = min(viable.items(), key=lambda kv: kv[1])
+
+            # compute available allocation remaining for this ticker under MAX_ALLOC
+            current_pos_value = holdings.get(pick, 0) * price
+            remaining_alloc_value = max(0.0, (MAX_ALLOC * total_val) - current_pos_value)
+            if remaining_alloc_value < (MIN_FRACTION * price if ALLOW_FRACTIONAL else price):
+                # can't add more to this ticker under allocation cap
+                del price_map[pick]
+                continue
+
+            # risk sizing for opportunistic buy
+            risk_capital = RISK_PCT * total_val
+            atr = compute_atr(pick)
+            if atr is None or atr <= 0:
+                atr = max(price * 0.01, 0.01)
+            stop_distance = max(ATR_MULT * atr, price * 0.005)
+            max_shares_by_risk = risk_capital / stop_distance if stop_distance > 0 else 0
+
+            max_shares_by_alloc = remaining_alloc_value / price if price > 0 else 0
+
+            # limit by what we can afford now
             if ALLOW_FRACTIONAL:
-                max_inv = min(cash,(MAX_ALLOC*total_val)-holdings.get(pick,0)*price)
-                shares = round(max_inv/price,3) if max_inv/price>=0.001 else 0
+                max_affordable = round(cash / price, 3)
             else:
-                shares = 1 if price<=cash else 0
-            if shares<=0 or shares*price>cash: break
-            cash-=shares*price
-            holdings[pick]=round(holdings.get(pick,0)+shares,3)
+                max_affordable = int(cash // price)
+
+            raw_shares = min(max_shares_by_risk, max_shares_by_alloc, max_affordable)
+
+            if ALLOW_FRACTIONAL:
+                shares = round(raw_shares, 3) if raw_shares >= MIN_FRACTION else 0
+            else:
+                shares = int(raw_shares)
+
+            if shares <= 0:
+                # nothing sensible to buy for this pick; remove and continue
+                del price_map[pick]
+                continue
+
+            # Execute opportunistic buy
+            cost = shares * price
+            cash -= cost
+            holdings[pick] = round(holdings.get(pick, 0) + shares, 3)
+            price_cache[pick] = price
             trade_log.append({
-                "ticker":pick,
-                "action":"BUY",
+                "ticker": pick,
+                "action": "BUY",
                 "trigger": "opportunistic",
                 "date": datetime.now().isoformat(),
-                "price":price,
-                "shares":shares
+                "price": price,
+                "shares": shares
             })
-            print(f"Bought {shares} of {pick} @ ${price:.2f} (opportunistic)")
-            summary['opportunistic'].append((pick,price,shares))
+            print(f"Bought {shares} of {pick} @ ${price:.2f} (opportunistic, ATR-sized)")
+            summary['opportunistic'].append((pick, price, shares))
+
+            # update price_map and continue until no viable buys or cash exhausted
+            price_map = {t: price_cache.get(t, get_current_price(t)) for t in set(holdings) | set(buy_list)}
     else:
         summary['no_alloc'] = True
 else:
