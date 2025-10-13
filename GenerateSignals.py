@@ -126,77 +126,75 @@ def last_signal(ticker, cost_basis_map=None):
     current_price = get_current_price(ticker)
     cb = cost_basis_map.get(ticker)
 
-    # ─── SELL LOGIC ─────────────────────────────────────
-    # Dynamnic Stop Percentages
+    # ATR-based volatility for stopping
     df['TR'] = pd.concat([
         df['High'] - df['Low'],
         (df['High'] - df['Close'].shift()).abs(),
         (df['Low'] - df['Close'].shift()).abs()
     ], axis=1).max(axis=1)
-    # Dynamic Period based on last 5 days - if not volatile use base (14 days) - else adjust
     recent_volatility = df['TR'].rolling(window=5).std().iloc[-1]
     base_window = 14
     adj_window = max(10, min(30, int(base_window * (1 + recent_volatility / df['TR'].mean()))))
     df['ATR'] = df['TR'].rolling(window=adj_window).mean()
-
     atr = df['ATR'].iloc[-1]
     if atr is None or pd.isna(atr):
-        atr = 0  # fallback
+        atr = 0
 
+    # ─── SELL LOGIC ─────────────────────────────────────
     if cb is not None:
         peak = df['Close'].max()
 
-        # Dynamic Trailing Stop
-        if peak - current_price >= 2 * atr:
-            return 'SELL', current_price, market_type, "trailing_stop"
-        #if current_price <= peak * (1 - TRAIL_STOP_PCT):
-        #    return 'SELL', current_price, market_type
-        
-        # Dynamic Stop Loss
+        # Wider trailing stop depending on market type
+        if market_type == "TRENDING" and peak - current_price >= 3.5 * atr:
+            return 'SELL', current_price, market_type, "trend_trailing_stop"
+        if market_type == "SIDEWAYS" and peak - current_price >= 2 * atr:
+            return 'SELL', current_price, market_type, "sideways_trailing_stop"
+
+        # ATR-based stop loss
         if cb - current_price >= 3 * atr:
             return 'SELL', current_price, market_type, "stop_loss"
-        #if current_price <= cb * (1 - STOP_LOSS_PCT):
-        #    return 'SELL', current_price, market_type
         
-        if current_price >= cb * (1 + TAKE_PROFIT_PCT):
-            return 'SELL', current_price, market_type, "take_profit"
+        # Remove this Fixed Profit (make trend based decisions instead)
+        #if current_price >= cb * (1 + TAKE_PROFIT_PCT):
+        #    return 'SELL', current_price, market_type, "take_profit"
 
     # ─── STRATEGY SWITCHING ──────────────────────────────────
 
     if market_type == "TRENDING": # Continual Trend Up - Reliable MACD/EMA signals
-        # Trend-Based Sell
+        # Only buy if above 200EMA filter
+        df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
+        if df['Close'].iloc[-1] < df['EMA200'].iloc[-1]:
+            return None, current_price, market_type, "below_200ema"
+
+        # Trend-based sell
         if df['Position'].iloc[-1] == -1 and macd_cross_down:
             return 'SELL', current_price, market_type, "ema_macd_crossover"
-        # Trend-Based Buy
+
+        # Trend-based buy with stricter filters
         recent = df[df['Position'].isin([1, -1])]
         if not recent.empty:
             last = recent.iloc[-1]
             if last['Position'] == 1 and macd_cross_up:
-                # Check RSI not overbrought 
-                if df['RSI'].iloc[-1] > 65:
-                    #print(f"{ticker}: Skipping TRENDING BUY — RSI too high")
-                    return None, current_price, market_type, "rsi_overbrought"
-                # Price not >5% than short EMA - as likely indicates a peak
+                if not (40 <= df['RSI'].iloc[-1] <= 65):
+                    return None, current_price, market_type, "rsi_filter_fail"
                 if current_price > df['Short_EMA'].iloc[-1] * 1.05:
-                    #print(f"{ticker}: Skipping TRENDING BUY — price extended above EMA")
                     return None, current_price, market_type, "extended_over_ema"
-                # Skip if price is >5% above yesterday’s close
-                if df['Close'].iloc[-1] > df['Close'].iloc[-2] * 1.05:
-                    #print(f"{ticker}: Skipping — large daily gain, wait for pullback")
-                    return None, current_price, market_type, "extended_over_close"
                 return 'BUY', current_price, market_type, "trend_buy"
             
-    elif market_type == "SIDEWAYS": # Market Bouncing Around - Need RSI/Bollinger bands to buy low sell high
+    if market_type == "SIDEWAYS":
         last_rsi = df['RSI'].iloc[-1]
         last_close = df['Close'].iloc[-1]
         upper_band = df['BB_upper'].iloc[-1]
         lower_band = df['BB_lower'].iloc[-1]
 
-        # Sideways Buy: Oversold + below lower band
-        if last_rsi < 30 and last_close < lower_band:
-            return 'BUY', current_price, market_type, "rsi_below_band"
 
-        # Sideways Sell: Overbought + above upper band
+        # Sideways buy: require RSI + band + reversal pattern
+        if last_rsi < 30 and last_close < lower_band:
+            # Extra filter: wait for confirmation (yesterday close < today close)
+            if df['Close'].iloc[-1] > df['Close'].iloc[-2]:
+                return 'BUY', current_price, market_type, "rsi_below_band_confirmed"
+
+        # Sideways sell
         if last_rsi > 70 and last_close > upper_band:
             return 'SELL', current_price, market_type, "rsi_above_band"
 
